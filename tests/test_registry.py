@@ -52,9 +52,7 @@ def test_get_llm_openai_compatible_success(mocker: MockerFixture) -> None:
     """
     # Mock dependencies
     mock_get_config = mocker.patch("modelforge.registry.config.get_config")
-    mock_get_credentials = mocker.patch(
-        "modelforge.registry.auth.get_credentials"
-    )
+    mock_get_credentials = mocker.patch("modelforge.registry.auth.get_credentials")
     mock_chat_openai = mocker.patch("modelforge.registry.ChatOpenAI")
 
     # Set up the configuration
@@ -87,7 +85,7 @@ def test_get_llm_openai_compatible_success(mocker: MockerFixture) -> None:
     assert llm_instance is not None
     mock_get_credentials.assert_called_once_with("openai", "gpt-4o-mini", verbose=False)
     mock_chat_openai.assert_called_once_with(
-        model="gpt-4o-mini",
+        model_name="gpt-4o-mini",
         api_key="test-api-key-123",
         base_url="https://api.openai.com/v1",
     )
