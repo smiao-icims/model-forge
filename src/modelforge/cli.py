@@ -109,9 +109,10 @@ def migrate_config() -> None:
 def add_model(
     provider: str,
     model: str,
-    api_model_name: str | None,
-    api_key: str | None,
-    dev_auth: bool,
+    api_model_name: str | None = None,
+    api_key: str | None = None,
+    dev_auth: bool = False,
+    *,
     local: bool = False,
 ) -> None:
     """Add a new model configuration."""
@@ -183,7 +184,7 @@ def use_model(provider_name: str, model_alias: str, local: bool) -> None:
     """Set the current model to use."""
     success = config.set_current_model(provider_name, model_alias, local=local)
     if not success:
-        raise click.ClickException(f"Failed to set model {provider_name}/{model_alias}")
+        raise click.ClickException("Failed to set model")
 
 
 @config_group.command(name="remove")
@@ -323,6 +324,82 @@ def test_model(prompt: str, verbose: bool) -> None:
     except Exception as e:
         logger.exception("Error occurred while running model test")
         click.echo(f"\nAn error occurred while running the model: {e}", err=True)
+
+
+@cli.command(name="status")
+@click.option("--provider", help="Check status for specific provider")
+@click.option("--verbose", is_flag=True, help="Show detailed token information")
+def status(provider: str | None, verbose: bool) -> None:
+    """Check authentication status for providers."""
+    try:
+        current_config, _ = config.get_config()
+        providers = current_config.get("providers", {})
+
+        if provider:
+            # Check specific provider
+            if provider not in providers:
+                click.echo(f"❌ Provider '{provider}' not found in configuration")
+                return
+            _check_provider_status(provider, providers[provider], verbose)
+        else:
+            # Check all providers
+            click.echo("🔍 Authentication Status for All Providers:\n")
+            for provider_name, provider_data in providers.items():
+                _check_provider_status(provider_name, provider_data, verbose)
+                click.echo()  # Empty line between providers
+
+    except Exception as e:
+        logger.exception("Failed to check authentication status")
+        click.echo(f"❌ Error checking status: {e}", err=True)
+
+
+def _check_provider_status(
+    provider_name: str, provider_data: dict[str, Any], verbose: bool
+) -> None:
+    """Check status for a specific provider."""
+    auth_strategy_name = provider_data.get("auth_strategy", "unknown")
+
+    click.echo(f"📋 Provider: {provider_name}")
+    click.echo(f"   Auth Strategy: {auth_strategy_name}")
+
+    if auth_strategy_name == "local":
+        click.echo("   Status: ✅ Local provider (no authentication needed)")
+        return
+
+    try:
+        auth_strategy = auth.get_auth_strategy(provider_name)
+        credentials = auth_strategy.get_credentials()
+
+        if credentials:
+            click.echo("   Status: ✅ Valid credentials found")
+
+            # Show detailed token info for device flow
+            if auth_strategy_name == "device_flow" and hasattr(
+                auth_strategy, "get_token_info"
+            ):
+                token_info = auth_strategy.get_token_info()
+                if token_info and verbose:
+                    click.echo("   Token Details:")
+                    if "time_remaining" in token_info:
+                        click.echo(
+                            f"      Time Remaining: {token_info['time_remaining']}"
+                        )
+                    if "expiry_time" in token_info:
+                        click.echo(f"      Expires At: {token_info['expiry_time']}")
+                    if "scope" in token_info:
+                        click.echo(f"      Scope: {token_info['scope']}")
+                elif token_info and not verbose:
+                    if "time_remaining" in token_info:
+                        remaining = str(token_info["time_remaining"]).split(".")[
+                            0
+                        ]  # Remove microseconds
+                        click.echo(f"   Time Remaining: {remaining}")
+        else:
+            click.echo("   Status: ❌ No valid credentials found")
+            click.echo(f"   Action: Run authentication for {provider_name}")
+
+    except Exception as e:
+        click.echo(f"   Status: ❌ Error checking credentials: {e}")
 
 
 def _invoke_with_smart_retry(
