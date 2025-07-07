@@ -68,7 +68,8 @@ class ModelForgeRegistry:
                 if not current_model:
                     logger.error("No model selected and no provider/model specified")
                     raise ConfigurationError(
-                        "No model selected. Use 'modelforge config use' or provide provider and model."
+                        "No model selected. Use 'modelforge config use' or provide "
+                        "provider and model."
                     )
                 provider_name = current_model.get("provider")
                 model_alias = current_model.get("model")
@@ -99,59 +100,13 @@ class ModelForgeRegistry:
             )
 
             if llm_type == "ollama":
-                return ChatOllama(
-                    model=model_alias, base_url=provider_data.get("base_url")
-                )
+                return self._create_ollama_llm(model_alias, provider_data)
 
             if llm_type == "github_copilot":
-                # Use dedicated ChatGitHubCopilot if available
-                if not GITHUB_COPILOT_AVAILABLE:
-                    logger.warning(
-                        "langchain-github-copilot not installed, falling back to openai_compatible"
-                    )
-                    # Fall back to openai_compatible behavior
-                    return self._create_openai_compatible_llm(
-                        provider_name, model_alias, provider_data, model_data
-                    )
-
-                # Use dedicated ChatGitHubCopilot
-                credentials = auth.get_credentials(
-                    provider_name, model_alias, verbose=self.verbose
+                return self._create_github_copilot_llm(
+                    provider_name, model_alias, provider_data, 
+                    model_data, auth_strategy_name
                 )
-                if not credentials:
-                    logger.error(
-                        "Could not retrieve credentials for provider: %s", provider_name
-                    )
-                    raise ProviderError(
-                        f"Could not retrieve credentials for provider '{provider_name}'"
-                    )
-
-                access_token = credentials.get("access_token")
-                if not access_token:
-                    logger.error(
-                        "Could not find access token for provider: %s", provider_name
-                    )
-                    raise ProviderError(
-                        f"Could not find access token for '{provider_name}'"
-                    )
-
-                # Debug information (only if verbose)
-                actual_model_name = model_data.get("api_model_name", model_alias)
-                if self.verbose:
-                    logger.debug("Creating ChatGitHubCopilot instance:")
-                    logger.debug("   Provider: %s", provider_name)
-                    logger.debug("   Model alias: %s", model_alias)
-                    logger.debug("   Actual model name: %s", actual_model_name)
-                    logger.debug(
-                        "   Access token: %s",
-                        "***" + access_token[-10:] if len(access_token) > 10 else "***",
-                    )
-                    logger.debug("   Auth strategy: %s", auth_strategy_name)
-
-                # Set the GitHub token as environment variable for ChatGitHubCopilot
-                os.environ["GITHUB_TOKEN"] = access_token
-
-                return ChatGitHubCopilot(model=actual_model_name)
 
             if llm_type == "openai_compatible":
                 return self._create_openai_compatible_llm(
@@ -159,27 +114,8 @@ class ModelForgeRegistry:
                 )
 
             if llm_type == "google_genai":
-                credentials = auth.get_credentials(
-                    provider_name, model_alias, verbose=self.verbose
-                )
-                if not credentials:
-                    logger.error(
-                        "Could not retrieve credentials for provider: %s", provider_name
-                    )
-                    raise ProviderError(
-                        f"Could not retrieve credentials for provider '{provider_name}'"
-                    )
-
-                api_key = credentials.get("api_key")
-                if not api_key:
-                    logger.error(
-                        "Could not find API key for provider: %s", provider_name
-                    )
-                    raise ProviderError(f"Could not find API key for '{provider_name}'")
-
-                return ChatGoogleGenerativeAI(
-                    model=model_data.get("api_model_name", model_alias),
-                    google_api_key=api_key,
+                return self._create_google_genai_llm(
+                    provider_name, model_alias, model_data
                 )
 
             logger.error(
@@ -189,12 +125,11 @@ class ModelForgeRegistry:
                 f"Unsupported llm_type '{llm_type}' for provider '{provider_name}'"
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "Error creating LLM instance for %s/%s: %s",
+                "Error creating LLM instance for %s/%s",
                 provider_name,
                 model_alias,
-                str(e),
             )
             raise
 
@@ -255,4 +190,97 @@ class ModelForgeRegistry:
 
         return ChatOpenAI(
             model_name=actual_model_name, api_key=api_key, base_url=base_url
+        )
+
+    def _create_ollama_llm(
+        self, model_alias: str, provider_data: dict[str, Any]
+    ) -> ChatOllama:
+        """Create ChatOllama instance."""
+        return ChatOllama(
+            model=model_alias, base_url=provider_data.get("base_url")
+        )
+
+    def _create_github_copilot_llm(
+        self,
+        provider_name: str,
+        model_alias: str,
+        provider_data: dict[str, Any],
+        model_data: dict[str, Any],
+        auth_strategy_name: str | None,
+    ) -> BaseChatModel:
+        """Create GitHub Copilot LLM instance."""
+        # Use dedicated ChatGitHubCopilot if available
+        if not GITHUB_COPILOT_AVAILABLE:
+            logger.warning(
+                "langchain-github-copilot not installed, falling back to "
+                "openai_compatible"
+            )
+            return self._create_openai_compatible_llm(
+                provider_name, model_alias, provider_data, model_data
+            )
+
+        # Use dedicated ChatGitHubCopilot
+        credentials = auth.get_credentials(
+            provider_name, model_alias, verbose=self.verbose
+        )
+        if not credentials:
+            logger.error(
+                "Could not retrieve credentials for provider: %s", provider_name
+            )
+            raise ProviderError(
+                f"Could not retrieve credentials for provider '{provider_name}'"
+            )
+
+        access_token = credentials.get("access_token")
+        if not access_token:
+            logger.error(
+                "Could not find access token for provider: %s", provider_name
+            )
+            raise ProviderError(
+                f"Could not find access token for '{provider_name}'"
+            )
+
+        # Debug information (only if verbose)
+        actual_model_name = model_data.get("api_model_name", model_alias)
+        if self.verbose:
+            logger.debug("Creating ChatGitHubCopilot instance:")
+            logger.debug("   Provider: %s", provider_name)
+            logger.debug("   Model alias: %s", model_alias)
+            logger.debug("   Actual model name: %s", actual_model_name)
+            logger.debug(
+                "   Access token: %s",
+                "***" + access_token[-10:] if len(access_token) > 10 else "***",
+            )
+            logger.debug("   Auth strategy: %s", auth_strategy_name)
+
+        # Set the GitHub token as environment variable for ChatGitHubCopilot
+        os.environ["GITHUB_TOKEN"] = access_token
+
+        return ChatGitHubCopilot(model=actual_model_name)
+
+    def _create_google_genai_llm(
+        self, provider_name: str, model_alias: str, model_data: dict[str, Any]
+    ) -> ChatGoogleGenerativeAI:
+        """Create Google GenAI LLM instance."""
+        credentials = auth.get_credentials(
+            provider_name, model_alias, verbose=self.verbose
+        )
+        if not credentials:
+            logger.error(
+                "Could not retrieve credentials for provider: %s", provider_name
+            )
+            raise ProviderError(
+                f"Could not retrieve credentials for provider '{provider_name}'"
+            )
+
+        api_key = credentials.get("api_key")
+        if not api_key:
+            logger.error(
+                "Could not find API key for provider: %s", provider_name
+            )
+            raise ProviderError(f"Could not find API key for '{provider_name}'")
+
+        return ChatGoogleGenerativeAI(
+            model=model_data.get("api_model_name", model_alias),
+            google_api_key=api_key,
         )

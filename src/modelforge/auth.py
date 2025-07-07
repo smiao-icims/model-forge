@@ -4,7 +4,7 @@ import getpass
 import json
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import keyring
@@ -30,12 +30,10 @@ class AuthStrategy(ABC):
     @abstractmethod
     def authenticate(self) -> dict[str, Any] | None:
         """Perform authentication and return credentials."""
-        pass
 
     @abstractmethod
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored credentials."""
-        pass
 
 
 class ApiKeyAuth(AuthStrategy):
@@ -63,10 +61,11 @@ class ApiKeyAuth(AuthStrategy):
             if api_key:
                 logger.debug("Retrieved API key for %s", self.provider_name)
                 return {"api_key": api_key}
-            logger.warning("No stored API key found for %s", self.provider_name)
-            return None
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to retrieve API key for %s", self.provider_name)
+            return None
+        else:
+            logger.warning("No stored API key found for %s", self.provider_name)
             return None
 
 
@@ -108,9 +107,7 @@ class DeviceFlowAuth(AuthStrategy):
                 "Network error requesting device code from %s",
                 self.provider_name,
             )
-            raise AuthenticationError(
-                f"Network error connecting to {self.provider_name}"
-            ) from e
+            raise AuthenticationError("Network error") from e
 
         logger.info("Device code obtained for %s", self.provider_name)
 
@@ -145,9 +142,7 @@ class DeviceFlowAuth(AuthStrategy):
                 "Invalid response from %s device code endpoint",
                 self.provider_name,
             )
-            raise AuthenticationError(
-                f"Invalid response from {self.provider_name} token endpoint"
-            ) from e
+            raise AuthenticationError("Invalid response") from e
         except requests.exceptions.HTTPError as e:
             # Check if this is a recoverable error
             try:
@@ -157,17 +152,12 @@ class DeviceFlowAuth(AuthStrategy):
                     self.provider_name,
                     error_info.get("error"),
                 )
-                raise AuthenticationError(
-                    f"Authentication failed for {self.provider_name}: "
-                    f"{error_info.get('error_description', 'Unknown error')}"
-                ) from e
+                raise AuthenticationError("Authentication failed") from e
             except requests.exceptions.JSONDecodeError:
                 logger.exception(
                     "HTTP error while polling for token from %s", self.provider_name
                 )
-                raise AuthenticationError(
-                    f"HTTP error while polling for token from {self.provider_name}"
-                ) from e
+                raise AuthenticationError("HTTP error") from e
         except requests.exceptions.RequestException as e:
             logger.exception(
                 "Network error while polling for token from %s",
@@ -242,9 +232,9 @@ class DeviceFlowAuth(AuthStrategy):
                     "access_token": token_data["access_token"],
                     "expires_in": expires_in,
                     "expires_at": (
-                        datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+                        datetime.now(UTC) + timedelta(seconds=expires_in)
                     ).isoformat(),
-                    "acquired_at": datetime.now(timezone.utc).isoformat(),
+                    "acquired_at": datetime.now(UTC).isoformat(),
                     "scope": token_data.get("scope", self.scope),
                 }
 
@@ -314,7 +304,7 @@ class DeviceFlowAuth(AuthStrategy):
                     # Add 5-minute buffer for token expiration
                     buffer_time = expiry_time - timedelta(minutes=5)
 
-                    if datetime.now(timezone.utc) >= buffer_time:
+                    if datetime.now(UTC) >= buffer_time:
                         logger.warning(
                             "Token for %s is expired or expiring soon",
                             self.provider_name,
@@ -324,8 +314,8 @@ class DeviceFlowAuth(AuthStrategy):
                             f"soon. Please re-authenticate."
                         )
                         print(
-                            f"Run: modelforge config add --provider {self.provider_name} "
-                            f"--model <model> --dev-auth"
+                            f"Run: modelforge config add --provider "
+                            f"{self.provider_name} --model <model> --dev-auth"
                         )
                         return None
 
@@ -336,19 +326,21 @@ class DeviceFlowAuth(AuthStrategy):
                 # Fallback to old format (plain string token)
                 if stored_data.startswith(("gho_", "ghr_")):
                     logger.warning(
-                        "Legacy token format detected for %s. Consider re-authenticating",
+                        "Legacy token format detected for %s. "
+                        "Consider re-authenticating",
                         self.provider_name,
                     )
                     print(
-                        f"Warning: Legacy token format detected for {self.provider_name}. "
-                        f"Consider re-authenticating for better expiration handling."
+                        f"Warning: Legacy token format detected for "
+                        f"{self.provider_name}. Consider re-authenticating for "
+                        f"better expiration handling."
                     )
                     return {"access_token": stored_data}
 
                 logger.warning("Invalid token format for %s", self.provider_name)
                 return None
 
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Failed to retrieve credentials for %s", self.provider_name
             )
@@ -369,15 +361,13 @@ class DeviceFlowAuth(AuthStrategy):
                     expiry_time = datetime.fromisoformat(
                         token_info["expires_at"].replace("Z", "+00:00")
                     )
-                    expires_in = int(
-                        (expiry_time - datetime.now(timezone.utc)).total_seconds()
-                    )
+                    expires_in = int((expiry_time - datetime.now(UTC)).total_seconds())
 
                     return {
                         "expires_in": expires_in,
                         "expiry_time": expiry_time,
-                        "time_remaining": expiry_time - datetime.now(timezone.utc),
-                        "is_expired": datetime.now(timezone.utc) >= expiry_time,
+                        "time_remaining": expiry_time - datetime.now(UTC),
+                        "is_expired": datetime.now(UTC) >= expiry_time,
                         "token_preview": token_info["access_token"][-10:]
                         if token_info.get("access_token")
                         else None,
@@ -386,20 +376,22 @@ class DeviceFlowAuth(AuthStrategy):
             except (json.JSONDecodeError, KeyError):
                 return {"legacy_token": True, "token_preview": stored_data[-10:]}
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to get token info for %s", self.provider_name)
             return None
 
 
 def get_auth_strategy(
-    provider_name: str, model_alias: str | None = None
+    provider_name: str,
+    model_alias: str | None = None,  # noqa: ARG001
 ) -> AuthStrategy:
     """
     Get the appropriate authentication strategy for a provider.
 
     Args:
         provider_name: The name of the provider.
-        model_alias: The alias of the model (not directly used here but good for context).
+        model_alias: The alias of the model (not directly used here but good
+            for context).
 
     Returns:
         An instance of the appropriate AuthStrategy subclass.
@@ -438,7 +430,7 @@ def get_auth_strategy(
         # Instantiate the appropriate auth strategy
         if auth_strategy_name == "api_key":
             return ApiKeyAuth(provider_name)
-        elif auth_strategy_name == "device_flow":
+        if auth_strategy_name == "device_flow":
             # Get auth details from provider configuration
             auth_details = provider_data.get("auth_details", {})
             required_fields = ["client_id", "device_code_url", "token_url", "scope"]
@@ -453,20 +445,19 @@ def get_auth_strategy(
                         f"Missing auth detail '{field}' for provider '{provider_name}'"
                     )
             return DeviceFlowAuth(provider_name, **auth_details)
-        elif auth_strategy_name == "local":
+        if auth_strategy_name == "local":
             return NoAuth(provider_name)
-        else:
-            logger.error(
-                "Unknown auth_strategy '%s' for provider '%s'",
-                auth_strategy_name,
-                provider_name,
-            )
-            raise AuthenticationError(
-                f"Unknown auth_strategy '{auth_strategy_name}' for provider "
-                f"'{provider_name}'"
-            )
+        logger.error(
+            "Unknown auth_strategy '%s' for provider '%s'",
+            auth_strategy_name,
+            provider_name,
+        )
+        raise AuthenticationError(
+            f"Unknown auth_strategy '{auth_strategy_name}' for provider "
+            f"'{provider_name}'"
+        )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get auth strategy for %s", provider_name)
         raise
 
@@ -492,11 +483,11 @@ def get_credentials(
         if credentials and verbose and logger.isEnabledFor(10):  # DEBUG level
             cred_keys = list(credentials.keys())
             logger.debug("Credential keys for %s: %s", provider_name, cred_keys)
-
-        return credentials
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get credentials for %s", provider_name)
         raise
+    else:
+        return credentials
 
 
 class NoAuth(AuthStrategy):

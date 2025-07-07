@@ -15,8 +15,9 @@ DUMMY_LOCAL_CONFIG_FILE = Path.cwd() / ".model-forge" / "config.json"
 @pytest.fixture(autouse=True)
 def _mock_config_paths(mocker: MockerFixture) -> None:
     """
-    A fixture that automatically mocks the global and local config file paths for all tests.
-    This prevents tests from accidentally using or modifying the real config files.
+    A fixture that automatically mocks the global and local config file paths for all
+    tests. This prevents tests from accidentally using or modifying the real 
+    config files.
     """
     # Mock the config file paths
     mocker.patch("modelforge.config.GLOBAL_CONFIG_FILE", DUMMY_GLOBAL_CONFIG_FILE)

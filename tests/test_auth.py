@@ -122,7 +122,11 @@ def test_device_flow_get_credentials_valid_token(mock_keyring: Mock) -> None:
     mock_keyring.get_password.return_value = json.dumps(token_info)
 
     auth_strategy = DeviceFlowAuth(
-        "test_provider", "test_client", "https://device.url", "https://token.url", "read:user"
+        "test_provider",
+        "test_client",
+        "https://device.url",
+        "https://token.url",
+        "read:user",
     )
 
     # Act
@@ -143,7 +147,11 @@ def test_device_flow_get_credentials_expired_token(mock_keyring: Mock) -> None:
     mock_keyring.get_password.return_value = json.dumps(token_info)
 
     auth_strategy = DeviceFlowAuth(
-        "test_provider", "test_client", "https://device.url", "https://token.url", "read:user"
+        "test_provider",
+        "test_client",
+        "https://device.url",
+        "https://token.url",
+        "read:user",
     )
 
     # Act

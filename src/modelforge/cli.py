@@ -2,35 +2,55 @@
 import json
 import random
 import time
-from pathlib import Path
 from typing import Any
 
 # Third-party imports
 import click
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 
 # Local imports
-from . import auth
-from . import config
-from .exceptions import ConfigurationError, ProviderError
+from . import auth, config
 from .logging_config import get_logger
 from .registry import ModelForgeRegistry
 
 logger = get_logger(__name__)
 
 
+def _handle_authentication(provider: str, api_key: str | None, dev_auth: bool) -> None:
+    """Handle authentication for provider configuration."""
+    if api_key:
+        auth_strategy = auth.ApiKeyAuth(provider)
+        # Store the provided API key directly
+        import keyring
+
+        keyring.set_password(provider, f"{provider}_user", api_key)
+        click.echo(f"API key stored securely for provider '{provider}'.")
+    elif dev_auth:
+        click.echo("Starting device authentication flow...")
+        try:
+            auth_strategy = auth.get_auth_strategy(provider)
+            credentials = auth_strategy.authenticate()
+            if credentials:
+                click.echo(f"Authentication successful for provider '{provider}'.")
+            else:
+                click.echo("Authentication failed.", err=True)
+                return
+        except Exception as e:
+            logger.exception("Device authentication failed")
+            click.echo(f"Device authentication failed: {e}", err=True)
+            return
+
+
 @click.group()
 def cli() -> None:
     """ModelForge CLI for managing LLM configurations."""
-    pass
 
 
 @cli.group()
 def config_group() -> None:
     """Configuration management commands."""
-    pass
 
 
 @config_group.command(name="show")
@@ -92,7 +112,7 @@ def add_model(
     api_model_name: str | None,
     api_key: str | None,
     dev_auth: bool,
-    local: bool,
+    local: bool = False,
 ) -> None:
     """Add a new model configuration."""
     try:
@@ -134,27 +154,7 @@ def add_model(
         config.save_config(current_config, local=local)
 
         # Handle authentication
-        if api_key:
-            auth_strategy = auth.ApiKeyAuth(provider)
-            # Store the provided API key directly
-            import keyring
-
-            keyring.set_password(provider, f"{provider}_user", api_key)
-            click.echo(f"API key stored securely for provider '{provider}'.")
-        elif dev_auth:
-            click.echo("Starting device authentication flow...")
-            try:
-                auth_strategy = auth.get_auth_strategy(provider)
-                credentials = auth_strategy.authenticate()
-                if credentials:
-                    click.echo(f"Authentication successful for provider '{provider}'.")
-                else:
-                    click.echo("Authentication failed.", err=True)
-                    return
-            except Exception as e:
-                logger.exception("Device authentication failed")
-                click.echo(f"Device authentication failed: {e}", err=True)
-                return
+        _handle_authentication(provider, api_key, dev_auth)
 
         # Success message
         scope_msg = "local" if local else "global"

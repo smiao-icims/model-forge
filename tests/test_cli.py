@@ -18,21 +18,21 @@ def runner() -> CliRunner:
 def _parse_output(output: str) -> dict[str, Any]:
     """Helper to parse JSON output from CLI commands."""
     lines = output.strip().split("\n")
-    
+
     # Find the start of JSON output (first line with "{")
     json_start = -1
     for i, line in enumerate(lines):
         if line.strip().startswith("{"):
             json_start = i
             break
-    
+
     if json_start == -1:
         return {}
-    
+
     # Join all lines from the JSON start to create complete JSON
     json_lines = lines[json_start:]
     json_text = "\n".join(json_lines)
-    
+
     try:
         parsed = json.loads(json_text)
         return parsed if isinstance(parsed, dict) else {}
