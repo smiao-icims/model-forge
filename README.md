@@ -8,7 +8,7 @@ This library is intended to be used by various Python-based AI projects to provi
 
 The library is composed of three core modules:
 
--   **`config`**: Manages configuration files with a two-tier system - global (`~/.model-forge/config.json`) and local (`./.model-forge/config.json`) - where all provider and model settings are stored.
+-   **`config`**: Manages configuration files with a two-tier system - global (`~/.config/model-forge/config.json`) and local (`./.model-forge/config.json`) - where all provider and model settings are stored.
 -   **`auth`**: Provides a suite of authentication strategies (API Key, OAuth 2.0 Device Flow, and a No-Op for local models) and handles secure credential storage using the system's native keyring.
 -   **`registry`**: Acts as the main entry point and factory. It reads the configuration, invokes the appropriate authentication strategy, and instantiates ready-to-use, LangChain-compatible LLM objects.
 
@@ -155,8 +155,8 @@ Use [models.dev](https://models.dev) to explore the full ecosystem and find the 
 
 ModelForge uses a **two-tier configuration system** that provides flexibility for both personal and project-specific setups:
 
-### 🌍 **Global Configuration** (`~/.model-forge/config.json`)
-- **Location**: User's home directory
+### 🌍 **Global Configuration** (`~/.config/model-forge/config.json`)
+- **Location**: User's config directory (follows XDG Base Directory Standard)
 - **Purpose**: System-wide model configurations shared across all projects
 - **Use case**: Personal API keys, frequently used models, default settings
 
