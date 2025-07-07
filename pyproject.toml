@@ -1,0 +1,167 @@
+[tool.poetry]
+name = "modelforge"
+version = "0.1.0"
+description = "A reusable library for managing LLM providers, authentication, and model selection."
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "modelforge", from = "src"}]
+
+# Add these classifiers for better PyPI discoverability
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+click = "^8.1.7"
+keyring = "^25.2.1"
+requests = "^2.32.3"
+langchain-core = "^0.3.0"
+langchain-openai = "^0.3.0"
+langchain-community = "^0.3.0"
+langchain-google-genai = "^2.1.5"
+langchain-github-copilot = "^0.4.0"
+
+[tool.poetry.scripts]
+modelforge = "modelforge.cli:cli"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.2"
+pytest-mock = "^3.14.0"
+# Code quality tools
+ruff = "^0.7.0"                    # Fast linter and formatter
+mypy = "^1.11.0"                   # Type checker
+pre-commit = "^3.8.0"              # Git hooks
+pytest-cov = "^5.0.0"              # Coverage reporting
+types-requests = "^2.32.0"         # Type stubs for requests
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# === Code Quality Configuration ===
+
+[tool.ruff]
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+select = ["E", "F", "W", "I", "N", "UP", "ANN", "S", "B", "A", "COM", "C4", "DTZ", "T10", "ISC", "ICN", "PIE", "PT", "Q", "RSE", "RET", "SIM", "TID", "ARG", "PTH", "ERA", "PL", "R", "TRY"]
+ignore = [
+    "ANN101",  # Missing type annotation for `self` in method
+    "ANN102",  # Missing type annotation for `cls` in classmethod
+    "COM812",  # Missing trailing comma (handled by formatter)
+    "ISC001",  # Single line implicit string concatenation (handled by formatter)
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# Assume Python 3.11+
+target-version = "py311"
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "langchain_core.*",
+    "langchain_openai.*",
+    "langchain_community.*",
+    "langchain_google_genai.*",
+    "langchain_github_copilot.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--cov=src/modelforge",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-branch",
+]
+
+[tool.coverage.run]
+source = ["src/modelforge"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+] 
