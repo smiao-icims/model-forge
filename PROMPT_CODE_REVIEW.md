@@ -32,7 +32,7 @@ except Exception:
     return None
 def func(a, b, c):  # no types
 
-# ✅ GOOD  
+# ✅ GOOD
 logger.error("Error occurred: %s", details)
 except SpecificError as e:
     raise ConfigurationError("Details") from e
@@ -44,7 +44,7 @@ def func(a: str, b: int, c: bool) -> Optional[str]:
 ### 🔴 Critical Issues
 - **File:Line**: Issue description and fix
 
-### 🟡 Important Issues  
+### 🟡 Important Issues
 - **File:Line**: Issue description and fix
 
 ### 🔵 Suggestions
@@ -58,4 +58,4 @@ Focus on: type safety, proper logging, custom exceptions, security, testability,
 
 ---
 
-**Usage**: Paste this prompt + your code when requesting reviews. 
+**Usage**: Paste this prompt + your code when requesting reviews.

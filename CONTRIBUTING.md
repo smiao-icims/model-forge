@@ -154,4 +154,4 @@ If you have questions, please:
 2. Create a new issue with the `question` label
 3. Be specific about what you're trying to do
 
-Thank you for contributing! 🎉 
+Thank you for contributing! 🎉

@@ -50,6 +50,14 @@ build-backend = "poetry.core.masonry.api"
 # === Code Quality Configuration ===
 
 [tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# Assume Python 3.11+
+target-version = "py311"
+
+[tool.ruff.lint]
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 select = ["E", "F", "W", "I", "N", "UP", "ANN", "S", "B", "A", "COM", "C4", "DTZ", "T10", "ISC", "ICN", "PIE", "PT", "Q", "RSE", "RET", "SIM", "TID", "ARG", "PTH", "ERA", "PL", "R", "TRY"]
 ignore = [
@@ -57,6 +65,8 @@ ignore = [
     "ANN102",  # Missing type annotation for `cls` in classmethod
     "COM812",  # Missing trailing comma (handled by formatter)
     "ISC001",  # Single line implicit string concatenation (handled by formatter)
+    "S101",    # Use of assert detected (normal in tests)
+    "PLR2004", # Magic value comparison (acceptable for tests)
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -86,13 +96,6 @@ exclude = [
     "node_modules",
     "venv",
 ]
-
-# Same as Black.
-line-length = 88
-indent-width = 4
-
-# Assume Python 3.11+
-target-version = "py311"
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
@@ -164,4 +167,4 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
-] 
+]

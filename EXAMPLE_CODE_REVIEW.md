@@ -33,17 +33,17 @@ def add_anthropic_provider(api_key, model_name):
     if not api_key:
         print("Error: API key required")
         return
-    
+
     config = {
         "llm_type": "anthropic",
         "base_url": "https://api.anthropic.com/v1",
         "auth_strategy": "api_key"
     }
-    
+
     try:
         # Test the API key
         response = requests.post(
-            config["base_url"] + "/messages", 
+            config["base_url"] + "/messages",
             headers={"x-api-key": api_key},
             json={"model": model_name, "messages": [{"role": "user", "content": "test"}]}
         )
@@ -130,24 +130,24 @@ ANTHROPIC_API_BASE = "https://api.anthropic.com/v1"
 def validate_anthropic_credentials(api_key: str, model_name: str) -> bool:
     """
     Validate Anthropic API credentials.
-    
+
     Args:
         api_key: The Anthropic API key to validate
         model_name: The model name to test with
-        
+
     Returns:
         True if credentials are valid, False otherwise
-        
+
     Raises:
         AuthenticationError: If validation fails due to invalid credentials
         ProviderError: If validation fails due to service issues
     """
     if not api_key or not api_key.strip():
         raise ValueError("API key cannot be empty")
-    
+
     if not model_name or not model_name.strip():
         raise ValueError("Model name cannot be empty")
-    
+
     try:
         response = requests.post(
             f"{ANTHROPIC_API_BASE}/messages",
@@ -159,7 +159,7 @@ def validate_anthropic_credentials(api_key: str, model_name: str) -> bool:
             },
             timeout=10
         )
-        
+
         if response.status_code == 200:
             logger.info("Anthropic API key validated successfully")
             return True
@@ -169,7 +169,7 @@ def validate_anthropic_credentials(api_key: str, model_name: str) -> bool:
         else:
             logger.error("Anthropic API validation failed: %s", response.status_code)
             raise ProviderError(f"API validation failed: {response.status_code}")
-            
+
     except requests.Timeout as e:
         logger.error("Anthropic API timeout: %s", str(e))
         raise ProviderError("API request timeout") from e
@@ -194,4 +194,4 @@ def validate_anthropic_credentials(api_key: str, model_name: str) -> bool:
 2. **Provide Context**: Explain why something is a problem
 3. **Show Examples**: Include corrected code when helpful
 4. **Stay Constructive**: Balance criticism with positive feedback
-5. **Focus on Learning**: Help developers understand the 'why' behind standards 
+5. **Focus on Learning**: Help developers understand the 'why' behind standards

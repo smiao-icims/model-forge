@@ -26,4 +26,4 @@ class TokenExpiredError(AuthenticationError):
 
 
 class InvalidProviderError(ProviderError):
-    """Raised when an invalid provider is specified.""" 
+    """Raised when an invalid provider is specified."""

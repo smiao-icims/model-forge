@@ -144,7 +144,7 @@ poetry add langchain-github-copilot
 
 # Option 2: Basic installation (fallback mode)
 git clone <repo>
-cd model-forge  
+cd model-forge
 ./setup.sh
 # Uses OpenAI-compatible fallback automatically
 ```

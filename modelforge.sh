@@ -39,4 +39,4 @@ if [ ! -d ".venv" ] && ! poetry env info >/dev/null 2>&1; then
 fi
 
 # Run the modelforge command with all passed arguments
-poetry run modelforge "$@" 
+poetry run modelforge "$@"

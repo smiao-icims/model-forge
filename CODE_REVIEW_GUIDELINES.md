@@ -31,7 +31,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from . import config, auth
 from .exceptions import AuthenticationError
 
-# ❌ BAD  
+# ❌ BAD
 from .exceptions import AuthenticationError
 from . import config, auth
 import json
@@ -54,14 +54,14 @@ from langchain_core.language_models.chat_models import BaseChatModel
 # ✅ GOOD
 def get_config() -> Tuple[Dict[str, Any], Path]:
     """Loads model configuration with local-over-global precedence."""
-    
+
 def set_current_model(provider: str, model: str, local: bool = False) -> bool:
     """Sets the currently active model in the configuration."""
 
 # ❌ BAD
 def get_config():
     """Loads model configuration with local-over-global precedence."""
-    
+
 def set_current_model(provider, model, local=False):
     """Sets the currently active model in the configuration."""
 ```
@@ -156,7 +156,7 @@ def _validate_provider_config(provider_data: Dict[str, Any], provider_name: str)
     """Validate provider configuration data."""
     if not provider_data:
         raise ConfigurationError(f"Provider '{provider_name}' not found")
-    
+
     required_fields = ["llm_type", "auth_strategy"]
     for field in required_fields:
         if field not in provider_data:
@@ -178,7 +178,7 @@ def get_llm(self, provider_name: Optional[str] = None, model_alias: Optional[str
             return None
         provider_name = current_model.get("provider")
         model_alias = current_model.get("model")
-    
+
     provider_data = self._config.get("providers", {}).get(provider_name)
     if not provider_data:
         print(f"Error: Provider '{provider_name}' not found...")
@@ -201,7 +201,7 @@ def get_llm(self, provider_name: Optional[str] = None, model_alias: Optional[str
 def get_credentials(provider_name: str, model_alias: str, verbose: bool = False) -> Optional[Dict[str, Any]]:
     """
     Retrieve stored credentials for a given provider.
-    
+
     Reads the configuration, determines the appropriate auth strategy,
     and returns the credentials if available.
 
@@ -241,11 +241,11 @@ def store_api_key(self, api_key: str) -> None:
     """Store API key securely using system keyring."""
     if not api_key or not api_key.strip():
         raise ValueError("API key cannot be empty")
-    
+
     # Validate API key format (example for OpenAI)
     if not api_key.startswith(('sk-', 'sk-proj-')):
         raise ValueError("Invalid API key format")
-    
+
     keyring.set_password(self.provider_name, self.username, api_key)
     logger.info("API key stored successfully for provider: %s", self.provider_name)
 
@@ -306,6 +306,252 @@ poetry run pytest tests/ -v
 - [ ] No test files are skipped or ignored
 - [ ] New functionality includes corresponding test coverage
 - [ ] Tests run in clean environment (no external dependencies)
+
+## 🧹 **Linter Error Clearance Checklist**
+
+### **📋 Pre-Review Requirements**
+Before any code review, **ALL** linter errors must be resolved. This section provides a systematic approach to clearing linter issues.
+
+### **🔍 Step 1: Automated Fixes**
+```bash
+# Apply all auto-fixable rules
+poetry run ruff check --fix .
+
+# Apply unsafe fixes (be careful, review changes)
+poetry run ruff check --fix --unsafe-fixes .
+
+# Format code with Black/Ruff
+poetry run ruff format .
+```
+
+### **🎯 Step 2: Common Linter Error Categories**
+
+#### **🏷️ Type Annotations (ANN001, ANN201, ANN202, ANN204)**
+**What to Fix:**
+- Missing type hints on function arguments: `ANN001`
+- Missing return type annotations: `ANN201` (public), `ANN202` (private), `ANN204` (special methods)
+
+**How to Fix:**
+```python
+# ❌ Before
+def process_data(items, verbose=False):
+    return processed_items
+
+# ✅ After  
+def process_data(items: list[str], verbose: bool = False) -> list[str]:
+    return processed_items
+
+# ✅ For functions that don't return
+def save_config(data: dict[str, Any]) -> None:
+    # implementation
+    
+# ✅ For fixtures and test functions
+def test_something(mock_client: Mock) -> None:
+    # test implementation
+```
+
+#### **📏 Line Length (E501)**
+**What to Fix:** Lines longer than 88 characters
+
+**How to Fix:**
+```python
+# ❌ Before
+raise ConfigurationError(f"Very long error message that exceeds the line length limit and should be split")
+
+# ✅ After
+raise ConfigurationError(
+    f"Very long error message that exceeds the line length limit "
+    f"and should be split"
+)
+```
+
+#### **🚨 Exception Handling (TRY003, TRY301, TRY400, TRY401)**
+**What to Fix:**
+- `TRY003`: Long messages in exception classes  
+- `TRY301`: Abstract raise to inner function
+- `TRY400`: Use `logging.exception` instead of `logging.error`
+- `TRY401`: Redundant exception object in logging.exception
+
+**How to Fix:**
+```python
+# ❌ TRY003: Long exception messages
+raise ConfigurationError(f"Very specific error message with {variable}")
+
+# ✅ Fix: Use shorter, generic messages
+raise ConfigurationError("Configuration error occurred") from e
+
+# ❌ TRY400: Using logger.error for exceptions  
+except Exception as e:
+    logger.error("Error occurred: %s", str(e))
+
+# ✅ Fix: Use logger.exception
+except Exception as e:
+    logger.exception("Error occurred")
+
+# ❌ TRY401: Redundant str(e) in exception logging
+logger.exception("Error: %s", str(e))
+
+# ✅ Fix: Remove redundant str(e)
+logger.exception("Error occurred")
+```
+
+#### **📁 Path Operations (PTH123)**
+**What to Fix:** Replace `open()` with `Path.open()`
+
+**How to Fix:**
+```python
+# ❌ Before
+with open(file_path, "w") as f:
+    json.dump(data, f)
+
+# ✅ After
+with Path(file_path).open("w") as f:
+    json.dump(data, f)
+```
+
+#### **🏗️ Function Complexity (PLR0912, PLR0915, PLR0913)**
+**What to Fix:**
+- `PLR0912`: Too many branches (>12)
+- `PLR0915`: Too many statements (>50)  
+- `PLR0913`: Too many arguments (>5)
+
+**How to Fix:**
+```python
+# ✅ Split complex functions
+def complex_function(self, arg1: str, arg2: str) -> Result:
+    # Split into smaller helper methods
+    validated_data = self._validate_input(arg1, arg2)
+    processed_data = self._process_data(validated_data)
+    return self._format_result(processed_data)
+
+def _validate_input(self, arg1: str, arg2: str) -> dict[str, Any]:
+    # validation logic
+    pass
+```
+
+#### **🔒 Security Issues (S106, S108, S110, S311)**
+**What to Fix:**
+- `S106`: Hardcoded passwords
+- `S108`: Insecure temp file usage
+- `S110`: try-except-pass without logging
+- `S311`: Insecure random generators
+
+**How to Fix:**
+```python
+# ❌ S110: Silent exception handling  
+try:
+    risky_operation()
+except Exception:
+    pass
+
+# ✅ Fix: Log the exception
+try:
+    risky_operation()
+except Exception:
+    logger.warning("Risky operation failed, continuing", exc_info=True)
+
+# ❌ S311: Insecure random
+delay = random.uniform(0, 1)
+
+# ✅ Fix: Use secrets for security-sensitive randomness or document why it's OK
+import secrets
+delay = secrets.SystemRandom().uniform(0, 1)  # For security
+# OR
+delay = random.uniform(0, 1)  # noqa: S311  # Not security-sensitive
+```
+
+#### **🧪 Test-Specific Issues (PT004)**
+**What to Fix:**
+- `PT004`: Fixtures that don't return anything should have leading underscore
+
+**How to Fix:**
+```python
+# ❌ Before
+@pytest.fixture
+def setup_database(db_connection):
+    # setup code
+    pass
+
+# ✅ After  
+@pytest.fixture
+def _setup_database(db_connection):
+    # setup code
+    pass
+```
+
+#### **📅 Datetime Issues (DTZ005)**
+**What to Fix:** datetime.now() without timezone
+
+**How to Fix:**
+```python
+# ❌ Before
+now = datetime.now()
+
+# ✅ After
+from datetime import datetime, timezone
+now = datetime.now(timezone.utc)
+```
+
+### **🔧 Step 3: Fixing Remaining Issues**
+
+#### **Priority Order:**
+1. **Type annotations** (ANN*) - Start here, affects mypy
+2. **Line length** (E501) - Easy formatting fixes  
+3. **Exception handling** (TRY*) - Code quality critical
+4. **Path operations** (PTH123) - Security/best practices
+5. **Complexity** (PLR*) - Architectural improvements
+6. **Security** (S*) - Security critical
+7. **Test issues** (PT*) - Test framework compliance
+
+#### **Quick Wins:**
+```bash
+# Check remaining errors by category
+poetry run ruff check . | grep "ANN001" | wc -l  # Count type annotation issues
+poetry run ruff check . | grep "E501" | wc -l    # Count line length issues  
+poetry run ruff check . | grep "TRY" | wc -l     # Count exception issues
+```
+
+### **✅ Final Verification**
+```bash
+# All linter checks should pass
+poetry run ruff check .                 # Should show 0 errors
+poetry run ruff format --check .        # Should show no formatting needed
+poetry run mypy .                       # Should show 0 type errors
+
+# Commit when clean
+git add -A
+git commit -m "style: resolve all linter errors
+
+- Add comprehensive type annotations  
+- Fix line length violations
+- Improve exception handling patterns
+- Replace open() with Path.open()  
+- Address security linting issues
+- All linter checks now pass ✅"
+```
+
+### **📝 Code Review Notes**
+When reviewing code with linter errors:
+
+**❌ Reject immediately if:**
+- Any linter errors remain unfixed
+- `poetry run ruff check .` shows non-zero errors
+- Type checking fails with `mypy .`
+
+**✅ Accept only when:**
+- All automated fixes have been applied
+- Manual fixes follow this checklist  
+- All tests still pass after fixes
+- Code maintainability is preserved or improved
+
+**🔄 Iterative Process:**
+1. Run automated fixes first
+2. Address type annotations systematically  
+3. Fix line length and formatting
+4. Resolve exception handling patterns
+5. Address security and complexity issues
+6. Verify all tests still pass
+7. Commit with descriptive message
 
 ## 🏗️ **Architecture Patterns to Enforce**
 
@@ -470,4 +716,4 @@ Structure feedback as:
 - Good separation of concerns
 ```
 
-Use these guidelines consistently to maintain ModelForge's code quality and help developers learn Python best practices. 
+Use these guidelines consistently to maintain ModelForge's code quality and help developers learn Python best practices.

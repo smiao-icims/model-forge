@@ -49,15 +49,15 @@ check_python_version() {
         print_error "Python 3 is not installed. Please install Python 3.11 or higher."
         exit 1
     fi
-    
+
     python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     required_version="3.11"
-    
+
     if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]; then
         print_error "Python $required_version or higher is required. Found: $python_version"
         exit 1
     fi
-    
+
     print_success "Python version $python_version is compatible"
 }
 
@@ -66,16 +66,16 @@ install_poetry() {
     if ! command_exists poetry; then
         print_info "Poetry not found. Installing Poetry..."
         curl -sSL https://install.python-poetry.org | python3 -
-        
+
         # Add Poetry to PATH for current session
         export PATH="$HOME/.local/bin:$PATH"
-        
+
         if ! command_exists poetry; then
             print_error "Poetry installation failed. Please install Poetry manually and try again."
             print_info "Visit: https://python-poetry.org/docs/#installation"
             exit 1
         fi
-        
+
         print_success "Poetry installed successfully"
     else
         print_success "Poetry is already installed"
@@ -85,15 +85,15 @@ install_poetry() {
 # Function to setup virtual environment and install dependencies
 setup_environment() {
     print_info "Setting up virtual environment and installing dependencies..."
-    
+
     # Configure Poetry to create virtual environment in project directory
     poetry config virtualenvs.in-project true
-    
+
     # Install dependencies
     poetry install
-    
+
     print_success "Dependencies installed successfully"
-    
+
     # Set up pre-commit hooks
     print_info "Setting up pre-commit hooks..."
     poetry run pre-commit install
@@ -103,13 +103,13 @@ setup_environment() {
 # Function to activate virtual environment
 activate_environment() {
     print_info "Activating virtual environment..."
-    
+
     # Check if we're already in a virtual environment
     if [ -n "$VIRTUAL_ENV" ]; then
         print_warning "Already in a virtual environment: $VIRTUAL_ENV"
         return
     fi
-    
+
     # Try to activate the Poetry virtual environment
     if [ -d ".venv" ]; then
         source .venv/bin/activate
@@ -160,11 +160,11 @@ run_tests() {
 # Main execution
 main() {
     print_header
-    
+
     # Parse command line arguments
     SKIP_TESTS=false
     HELP=false
-    
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             --skip-tests)
@@ -182,7 +182,7 @@ main() {
                 ;;
         esac
     done
-    
+
     if [ "$HELP" = true ]; then
         echo "ModelForge Setup Script"
         echo
@@ -201,25 +201,25 @@ main() {
         echo
         exit 0
     fi
-    
+
     # Check if we're in the correct directory
     if [ ! -f "pyproject.toml" ]; then
         print_error "pyproject.toml not found. Please run this script from the model-forge directory."
         exit 1
     fi
-    
+
     # Execute setup steps
     check_python_version
     install_poetry
     setup_environment
-    
+
     # Run tests unless skipped
     if [ "$SKIP_TESTS" = false ]; then
         run_tests
     fi
-    
+
     show_usage
 }
 
 # Run main function
-main "$@" 
+main "$@"

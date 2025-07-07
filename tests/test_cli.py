@@ -1,34 +1,43 @@
+"""Tests for the CLI module."""
+
+import json
+from typing import Any
+
 import pytest
 from click.testing import CliRunner
-from modelforge.cli import cli
+
 from modelforge import config
-import json
+from modelforge.cli import cli
+
 
 @pytest.fixture
-def runner():
+def runner() -> CliRunner:
     return CliRunner()
 
-def _parse_output(output: str) -> dict:
-    """Helper to strip the header from the `show` command's output."""
-    try:
-        # Find the first '{' which marks the beginning of the JSON
-        json_start = output.index('{')
-        return json.loads(output[json_start:])
-    except (ValueError, json.JSONDecodeError):
-        return {}
 
-def test_config_show_reports_global_by_default(runner):
+def _parse_output(output: str) -> dict[Any, Any]:
+    """Helper to parse JSON output from CLI commands."""
+    lines = output.strip().split("\n")
+    for line in lines:
+        if line.startswith("{"):
+            return json.loads(line)
+    return {}
+
+
+def test_config_show_reports_global_by_default(runner: CliRunner) -> None:
     """Test `show` reports a global config by default."""
     result = runner.invoke(cli, ["config", "show"])
     assert result.exit_code == 0
     assert "Active ModelForge Config (global)" in result.output
     assert "Configuration is empty" in result.output
 
-def test_config_add_local_and_show(runner):
+
+def test_config_add_local_and_show(runner: CliRunner) -> None:
     """Test adding a model to a local config and showing it."""
     # Add a model with --local
     add_result = runner.invoke(cli, [
-        "config", "add", "--provider", "local_ollama",
+        "config", "add",
+        "--provider", "local_ollama",
         "--model", "local_model", "--local"
     ])
     assert add_result.exit_code == 0
@@ -38,21 +47,25 @@ def test_config_add_local_and_show(runner):
     show_result = runner.invoke(cli, ["config", "show"])
     assert show_result.exit_code == 0
     assert "Active ModelForge Config (local)" in show_result.output
-    
+
     config_data = _parse_output(show_result.output)
     assert "local_ollama" in config_data["providers"]
 
-def test_config_use_local_model(runner):
+
+def test_config_use_local_model(runner: CliRunner) -> None:
     """Test using a model from a local config."""
     # Add a model to the local config first
     runner.invoke(cli, [
-        "config", "add", "--provider", "p",
-        "--model", "m", "--local"
+        "config", "add",
+        "--provider", "p",
+        "--model", "m",
+        "--local"
     ])
-    
-    # Use the --local flag to set the current model
+
+    # Use the model
     use_result = runner.invoke(cli, [
-        "config", "use", "--provider", "p",
+        "config", "use",
+        "--provider", "p",
         "--model", "m", "--local"
     ])
     assert use_result.exit_code == 0
@@ -62,17 +75,21 @@ def test_config_use_local_model(runner):
     local_config, _ = config.get_config_from_path(config.LOCAL_CONFIG_FILE)
     assert local_config["current_model"] == {"provider": "p", "model": "m"}
 
-def test_config_remove_local_model(runner):
+
+def test_config_remove_local_model(runner: CliRunner) -> None:
     """Test removing a model from a local config."""
     # Add a model to the local config
     runner.invoke(cli, [
-        "config", "add", "--provider", "p",
-        "--model", "m", "--local"
+        "config", "add",
+        "--provider", "p",
+        "--model", "m",
+        "--local"
     ])
-    
-    # Remove the model using the --local flag
+
+    # Remove the model
     remove_result = runner.invoke(cli, [
-        "config", "remove", "--provider", "p",
+        "config", "remove",
+        "--provider", "p",
         "--model", "m", "--local"
     ])
     assert remove_result.exit_code == 0

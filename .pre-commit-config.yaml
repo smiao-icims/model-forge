@@ -32,4 +32,4 @@ repos:
     hooks:
       - id: poetry-check
       - id: poetry-lock
-        args: [--check] 
+        args: [--check]
