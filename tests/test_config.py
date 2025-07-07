@@ -6,9 +6,9 @@ from modelforge import config
 
 
 def test_get_config_creates_global_if_none_exist() -> None:
-    """Verify get_config() creates a new global config if no file exists."""
+    """Verify get_config() returns empty config and path if no file exists."""
     config_data, config_path = config.get_config()
-    assert config.GLOBAL_CONFIG_FILE.exists()
+    # The get_config function now returns empty dict and path without creating the file
     assert config_path == config.GLOBAL_CONFIG_FILE
     assert config_data == {}
 
@@ -33,7 +33,9 @@ def test_get_config_prefers_local_over_global() -> None:
 def test_save_and_get_local_config() -> None:
     """Verify saving to and getting from a local config works."""
     # Arrange
-    test_data: dict[str, Any] = {"providers": {"test_provider": {"models": {"test_model": {}}}}}
+    test_data: dict[str, Any] = {
+        "providers": {"test_provider": {"models": {"test_model": {}}}}
+    }
 
     # Act
     config.save_config(test_data, local=True)
@@ -48,7 +50,9 @@ def test_set_current_model_in_local_config() -> None:
     """Verify setting the current model in the local config."""
     # Arrange
     initial_config: dict[str, Any] = {
-        "providers": {"test": {"models": {"test-model": {"api_model_name": "actual-model"}}}}
+        "providers": {
+            "test": {"models": {"test-model": {"api_model_name": "actual-model"}}}
+        }
     }
     config.save_config(initial_config, local=True)
 

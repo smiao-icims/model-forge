@@ -48,7 +48,9 @@ def test_api_key_auth_get_credentials_found(mock_keyring: Mock) -> None:
 
     credentials = auth_strategy.get_credentials()
 
-    mock_keyring.get_password.assert_called_once_with("test_provider", "test_provider_user")
+    mock_keyring.get_password.assert_called_once_with(
+        "test_provider", "test_provider_user"
+    )
     assert credentials == {"api_key": "stored-api-key"}
 
 
@@ -80,11 +82,15 @@ def test_device_flow_auth_success(mock_keyring: Mock, mock_requests: Mock) -> No
             ),
         ),
         # First token request (pending)
-        Mock(status_code=400, json=Mock(return_value={"error": "authorization_pending"})),
+        Mock(
+            status_code=400, json=Mock(return_value={"error": "authorization_pending"})
+        ),
         # Second token request (success)
         Mock(
             status_code=200,
-            json=Mock(return_value={"access_token": "test-access-token", "expires_in": 3600}),
+            json=Mock(
+                return_value={"access_token": "test-access-token", "expires_in": 3600}
+            ),
         ),
     ]
 
@@ -116,7 +122,7 @@ def test_device_flow_get_credentials_valid_token(mock_keyring: Mock) -> None:
     mock_keyring.get_password.return_value = json.dumps(token_info)
 
     auth_strategy = DeviceFlowAuth(
-        "test_provider", "test_client", "https://device.url", "https://token.url"
+        "test_provider", "test_client", "https://device.url", "https://token.url", "read:user"
     )
 
     # Act
@@ -137,7 +143,7 @@ def test_device_flow_get_credentials_expired_token(mock_keyring: Mock) -> None:
     mock_keyring.get_password.return_value = json.dumps(token_info)
 
     auth_strategy = DeviceFlowAuth(
-        "test_provider", "test_client", "https://device.url", "https://token.url"
+        "test_provider", "test_client", "https://device.url", "https://token.url", "read:user"
     )
 
     # Act

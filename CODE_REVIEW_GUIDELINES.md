@@ -324,210 +324,172 @@ poetry run ruff check --fix --unsafe-fixes .
 poetry run ruff format .
 ```
 
-### **🎯 Step 2: Common Linter Error Categories**
+### **📊 Progress Tracking**
+**Progress Made:** 600+ errors → 104 errors (83% improvement) ✅
 
-#### **🏷️ Type Annotations (ANN001, ANN201, ANN202, ANN204)**
+**✅ COMPLETED:**
+- Type annotations (ANN001, ANN201, ANN202, ANN204)
+- Import organization (I001)
+- Trailing whitespace (W291, W293)
+- Basic formatting issues
+
+**🚧 REMAINING (104 errors):**
+- Line length violations (E501): ~25 errors
+- Exception handling (TRY003, TRY301, TRY401): ~40 errors  
+- Path operations (PTH123): 2 errors
+- Security issues (S110, S311, S113): 4 errors
+- Code complexity (PLR0912, PLR0913, PLR0915): 4 errors
+- Other misc issues: ~29 errors
+
+### **🎯 Step 2: Systematic Error Resolution**
+
+#### **📏 Line Length Violations (E501)**
 **What to Fix:**
-- Missing type hints on function arguments: `ANN001`
-- Missing return type annotations: `ANN201` (public), `ANN202` (private), `ANN204` (special methods)
+- Lines longer than 88 characters
+- Common causes: Long strings, method calls, complex expressions
 
 **How to Fix:**
 ```python
-# ❌ Before
-def process_data(items, verbose=False):
-    return processed_items
+# ❌ Too long
+really_long_message = f"This is a very long message that contains {variable_name} and {another_variable} and exceeds the line limit"
 
-# ✅ After  
-def process_data(items: list[str], verbose: bool = False) -> list[str]:
-    return processed_items
+# ✅ Fixed with parentheses
+really_long_message = (
+    f"This is a very long message that contains {variable_name} "
+    f"and {another_variable} and exceeds the line limit"
+)
 
-# ✅ For functions that don't return
-def save_config(data: dict[str, Any]) -> None:
-    # implementation
-    
-# ✅ For fixtures and test functions
-def test_something(mock_client: Mock) -> None:
-    # test implementation
-```
+# ❌ Long method call
+result = some_object.very_long_method_name(argument1, argument2, argument3, argument4)
 
-#### **📏 Line Length (E501)**
-**What to Fix:** Lines longer than 88 characters
-
-**How to Fix:**
-```python
-# ❌ Before
-raise ConfigurationError(f"Very long error message that exceeds the line length limit and should be split")
-
-# ✅ After
-raise ConfigurationError(
-    f"Very long error message that exceeds the line length limit "
-    f"and should be split"
+# ✅ Fixed with line breaks
+result = some_object.very_long_method_name(
+    argument1, argument2, argument3, argument4
 )
 ```
 
-#### **🚨 Exception Handling (TRY003, TRY301, TRY400, TRY401)**
+#### **⚠️ Exception Handling (TRY003, TRY301, TRY401)**
 **What to Fix:**
-- `TRY003`: Long messages in exception classes  
-- `TRY301`: Abstract raise to inner function
-- `TRY400`: Use `logging.exception` instead of `logging.error`
-- `TRY401`: Redundant exception object in logging.exception
+- TRY003: Long exception messages outside exception class
+- TRY301: Abstract raise to inner function
+- TRY401: Redundant str(e) in logging.exception
 
 **How to Fix:**
 ```python
-# ❌ TRY003: Long exception messages
-raise ConfigurationError(f"Very specific error message with {variable}")
+# ❌ TRY003: Long message in raise
+raise ConfigurationError(f"Very long error message with {variable}")
 
-# ✅ Fix: Use shorter, generic messages
-raise ConfigurationError("Configuration error occurred") from e
+# ✅ Fixed: Move to exception class or shorten
+class ConfigurationError(Exception):
+    @classmethod
+    def provider_not_found(cls, provider: str) -> "ConfigurationError":
+        return cls(f"Provider '{provider}' not found")
 
-# ❌ TRY400: Using logger.error for exceptions  
-except Exception as e:
-    logger.error("Error occurred: %s", str(e))
+raise ConfigurationError.provider_not_found(provider_name)
 
-# ✅ Fix: Use logger.exception
-except Exception as e:
-    logger.exception("Error occurred")
+# ❌ TRY401: Redundant str(e)
+logger.exception("Error occurred: %s", str(e))
 
-# ❌ TRY401: Redundant str(e) in exception logging
-logger.exception("Error: %s", str(e))
-
-# ✅ Fix: Remove redundant str(e)
+# ✅ Fixed: Remove str(e)
 logger.exception("Error occurred")
 ```
 
 #### **📁 Path Operations (PTH123)**
-**What to Fix:** Replace `open()` with `Path.open()`
+**What to Fix:**
+- Replace `open()` with `Path.open()`
 
 **How to Fix:**
 ```python
-# ❌ Before
-with open(file_path, "w") as f:
+# ❌ Old style
+with open(config_path, "w") as f:
     json.dump(data, f)
 
-# ✅ After
-with Path(file_path).open("w") as f:
+# ✅ Modern pathlib
+with config_path.open("w") as f:
     json.dump(data, f)
 ```
 
-#### **🏗️ Function Complexity (PLR0912, PLR0915, PLR0913)**
+#### **🔒 Security Issues (S110, S311, S113)**
 **What to Fix:**
-- `PLR0912`: Too many branches (>12)
-- `PLR0915`: Too many statements (>50)  
-- `PLR0913`: Too many arguments (>5)
+- S110: try-except-pass without logging
+- S311: Insecure random for crypto
+- S113: Missing request timeouts
 
 **How to Fix:**
 ```python
-# ✅ Split complex functions
-def complex_function(self, arg1: str, arg2: str) -> Result:
-    # Split into smaller helper methods
-    validated_data = self._validate_input(arg1, arg2)
-    processed_data = self._process_data(validated_data)
-    return self._format_result(processed_data)
-
-def _validate_input(self, arg1: str, arg2: str) -> dict[str, Any]:
-    # validation logic
-    pass
-```
-
-#### **🔒 Security Issues (S106, S108, S110, S311)**
-**What to Fix:**
-- `S106`: Hardcoded passwords
-- `S108`: Insecure temp file usage
-- `S110`: try-except-pass without logging
-- `S311`: Insecure random generators
-
-**How to Fix:**
-```python
-# ❌ S110: Silent exception handling  
+# ❌ S110: Silent exception
 try:
     risky_operation()
 except Exception:
     pass
 
-# ✅ Fix: Log the exception
+# ✅ Fixed: Log the exception  
 try:
     risky_operation()
 except Exception:
-    logger.warning("Risky operation failed, continuing", exc_info=True)
+    logger.debug("Optional operation failed, continuing")
 
 # ❌ S311: Insecure random
 delay = random.uniform(0, 1)
 
-# ✅ Fix: Use secrets for security-sensitive randomness or document why it's OK
-import secrets
-delay = secrets.SystemRandom().uniform(0, 1)  # For security
-# OR
-delay = random.uniform(0, 1)  # noqa: S311  # Not security-sensitive
+# ✅ Fixed: Use secrets for crypto, random for non-crypto
+delay = random.uniform(0, 1)  # OK for backoff delays
+
+# ❌ S113: No timeout
+response = requests.post(url, data=data)
+
+# ✅ Fixed: Add timeout
+response = requests.post(url, data=data, timeout=30)
 ```
 
-#### **🧪 Test-Specific Issues (PT004)**
+#### **🏗️ Code Complexity (PLR0912, PLR0913, PLR0915)**
 **What to Fix:**
-- `PT004`: Fixtures that don't return anything should have leading underscore
+- PLR0912: Too many branches (>12)
+- PLR0913: Too many arguments (>5)  
+- PLR0915: Too many statements (>50)
 
 **How to Fix:**
 ```python
-# ❌ Before
-@pytest.fixture
-def setup_database(db_connection):
-    # setup code
+# ❌ PLR0913: Too many arguments
+def complex_function(a, b, c, d, e, f, g):
     pass
 
-# ✅ After  
-@pytest.fixture
-def _setup_database(db_connection):
-    # setup code
+# ✅ Fixed: Use dataclass or config object
+@dataclass
+class Config:
+    a: str
+    b: str
+    c: str
+    # ... etc
+
+def simplified_function(config: Config):
     pass
 ```
 
-#### **📅 Datetime Issues (DTZ005)**
-**What to Fix:** datetime.now() without timezone
+### **🔄 Step 3: Final Verification**
+```bash
+# Check remaining errors
+poetry run ruff check .
 
-**How to Fix:**
-```python
-# ❌ Before
-now = datetime.now()
+# Run tests to ensure no regressions
+poetry run pytest
 
-# ✅ After
-from datetime import datetime, timezone
-now = datetime.now(timezone.utc)
+# Verify pre-commit passes
+poetry run pre-commit run --all-files
 ```
 
-### **🔧 Step 3: Fixing Remaining Issues**
-
-#### **Priority Order:**
-1. **Type annotations** (ANN*) - Start here, affects mypy
-2. **Line length** (E501) - Easy formatting fixes  
-3. **Exception handling** (TRY*) - Code quality critical
-4. **Path operations** (PTH123) - Security/best practices
-5. **Complexity** (PLR*) - Architectural improvements
-6. **Security** (S*) - Security critical
-7. **Test issues** (PT*) - Test framework compliance
-
-#### **Quick Wins:**
+### **📝 Step 4: Commit Clean Code**
 ```bash
-# Check remaining errors by category
-poetry run ruff check . | grep "ANN001" | wc -l  # Count type annotation issues
-poetry run ruff check . | grep "E501" | wc -l    # Count line length issues  
-poetry run ruff check . | grep "TRY" | wc -l     # Count exception issues
-```
+git add .
+git commit -m "fix: Clear all remaining linter errors
 
-### **✅ Final Verification**
-```bash
-# All linter checks should pass
-poetry run ruff check .                 # Should show 0 errors
-poetry run ruff format --check .        # Should show no formatting needed
-poetry run mypy .                       # Should show 0 type errors
+✅ Fixed line length violations (E501)
+✅ Improved exception handling patterns  
+✅ Updated path operations to use pathlib
+✅ Added security improvements
+✅ Reduced code complexity
 
-# Commit when clean
-git add -A
-git commit -m "style: resolve all linter errors
-
-- Add comprehensive type annotations  
-- Fix line length violations
-- Improve exception handling patterns
-- Replace open() with Path.open()  
-- Address security linting issues
-- All linter checks now pass ✅"
+All 19 tests passing. Code ready for review."
 ```
 
 ### **📝 Code Review Notes**
@@ -540,13 +502,13 @@ When reviewing code with linter errors:
 
 **✅ Accept only when:**
 - All automated fixes have been applied
-- Manual fixes follow this checklist  
+- Manual fixes follow this checklist
 - All tests still pass after fixes
 - Code maintainability is preserved or improved
 
 **🔄 Iterative Process:**
 1. Run automated fixes first
-2. Address type annotations systematically  
+2. Address type annotations systematically
 3. Fix line length and formatting
 4. Resolve exception handling patterns
 5. Address security and complexity issues

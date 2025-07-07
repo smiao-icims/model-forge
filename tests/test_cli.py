@@ -35,11 +35,18 @@ def test_config_show_reports_global_by_default(runner: CliRunner) -> None:
 def test_config_add_local_and_show(runner: CliRunner) -> None:
     """Test adding a model to a local config and showing it."""
     # Add a model with --local
-    add_result = runner.invoke(cli, [
-        "config", "add",
-        "--provider", "local_ollama",
-        "--model", "local_model", "--local"
-    ])
+    add_result = runner.invoke(
+        cli,
+        [
+            "config",
+            "add",
+            "--provider",
+            "local_ollama",
+            "--model",
+            "local_model",
+            "--local",
+        ],
+    )
     assert add_result.exit_code == 0
     assert "in the local config" in add_result.output
 
@@ -55,19 +62,12 @@ def test_config_add_local_and_show(runner: CliRunner) -> None:
 def test_config_use_local_model(runner: CliRunner) -> None:
     """Test using a model from a local config."""
     # Add a model to the local config first
-    runner.invoke(cli, [
-        "config", "add",
-        "--provider", "p",
-        "--model", "m",
-        "--local"
-    ])
+    runner.invoke(cli, ["config", "add", "--provider", "p", "--model", "m", "--local"])
 
     # Use the model
-    use_result = runner.invoke(cli, [
-        "config", "use",
-        "--provider", "p",
-        "--model", "m", "--local"
-    ])
+    use_result = runner.invoke(
+        cli, ["config", "use", "--provider", "p", "--model", "m", "--local"]
+    )
     assert use_result.exit_code == 0
     assert "in the local config" in use_result.output
 
@@ -79,19 +79,12 @@ def test_config_use_local_model(runner: CliRunner) -> None:
 def test_config_remove_local_model(runner: CliRunner) -> None:
     """Test removing a model from a local config."""
     # Add a model to the local config
-    runner.invoke(cli, [
-        "config", "add",
-        "--provider", "p",
-        "--model", "m",
-        "--local"
-    ])
+    runner.invoke(cli, ["config", "add", "--provider", "p", "--model", "m", "--local"])
 
     # Remove the model
-    remove_result = runner.invoke(cli, [
-        "config", "remove",
-        "--provider", "p",
-        "--model", "m", "--local"
-    ])
+    remove_result = runner.invoke(
+        cli, ["config", "remove", "--provider", "p", "--model", "m", "--local"]
+    )
     assert remove_result.exit_code == 0
     assert "Removed provider 'p'" in remove_result.output
 

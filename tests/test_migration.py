@@ -76,7 +76,7 @@ def test_migrate_new_config_exists(runner: CliRunner) -> None:
     # Assert
     assert result.exit_code == 0
     assert "new global configuration already exists" in result.output
-    assert OLD_CONFIG_FILE.exists() # Old file should NOT be moved
+    assert OLD_CONFIG_FILE.exists()  # Old file should NOT be moved
 
     # Verify new config is untouched
     with new_global_config_file.open() as f:

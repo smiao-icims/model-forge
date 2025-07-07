@@ -1,6 +1,5 @@
 """Tests for the ModelForgeRegistry."""
 
-
 from pytest_mock import MockerFixture
 
 from modelforge.registry import ModelForgeRegistry
@@ -20,6 +19,7 @@ def test_get_llm_ollama_success(mocker: MockerFixture) -> None:
         "providers": {
             "local_ollama": {
                 "llm_type": "ollama",
+                "base_url": "http://localhost:11434",
                 "models": {
                     "qwen3:1.7b": {
                         "api_model_name": "qwen3:1.7b",
@@ -53,7 +53,7 @@ def test_get_llm_openai_compatible_success(mocker: MockerFixture) -> None:
     # Mock dependencies
     mock_get_config = mocker.patch("modelforge.registry.config.get_config")
     mock_get_credentials = mocker.patch(
-        "modelforge.registry.auth.get_auth_strategy_and_credentials"
+        "modelforge.registry.auth.get_credentials"
     )
     mock_chat_openai = mocker.patch("modelforge.registry.ChatOpenAI")
 

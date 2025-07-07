@@ -1,21 +1,20 @@
 # Standard library imports
 import json
-import os
 import random
 import time
+from pathlib import Path
 from typing import Any
 
 # Third-party imports
 import click
-import keyring
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-# Import LangChain components
-from langchain_core.prompts import ChatPromptTemplate
-
 # Local imports
-from . import auth, config
+from . import auth
+from . import config
+from .exceptions import ConfigurationError, ProviderError
 from .logging_config import get_logger
 from .registry import ModelForgeRegistry
 
@@ -25,11 +24,13 @@ logger = get_logger(__name__)
 @click.group()
 def cli() -> None:
     """ModelForge CLI for managing LLM configurations."""
+    pass
 
 
 @cli.group()
 def config_group() -> None:
     """Configuration management commands."""
+    pass
 
 
 @config_group.command(name="show")
@@ -37,27 +38,24 @@ def show_config() -> None:
     """Shows the current configuration."""
     try:
         current_config, config_path = config.get_config()
-
         scope = "local" if config_path == config.LOCAL_CONFIG_FILE else "global"
+        click.echo(f"Active ModelForge Config ({scope}): {config_path}")
 
-        click.echo(f"--- Active ModelForge Config ({scope}) ---")
-        click.echo(f"Location: {config_path}\n")
-
-        if not current_config.get("providers"):
+        if not current_config or not current_config.get("providers"):
             click.echo(
-                "Configuration is empty. Use 'modelforge config add' to add a model."
+                "Configuration is empty. Add models using 'modelforge config add'."
             )
             return
 
         click.echo(json.dumps(current_config, indent=4))
     except Exception as e:
-        logger.exception("Failed to show configuration: %s", str(e))
+        logger.exception("Failed to show configuration")
         click.echo(f"Error: Failed to show configuration: {e}", err=True)
 
 
 @config_group.command(name="migrate")
 def migrate_config() -> None:
-    """Migrates configuration from the old location to the new location."""
+    """Migrates configuration from old location to new global location."""
     config.migrate_old_config()
 
 
@@ -65,7 +63,10 @@ def migrate_config() -> None:
 @click.option(
     "--provider",
     required=True,
-    help="The name of the provider (e.g., 'openai', 'ollama', 'github_copilot', 'google').",
+    help=(
+        "The name of the provider (e.g., 'openai', 'ollama', "
+        "'github_copilot', 'google')."
+    ),
 )
 @click.option(
     "--model",
@@ -81,7 +82,8 @@ def migrate_config() -> None:
     "--dev-auth", is_flag=True, help="Use device authentication flow, if applicable."
 )
 @click.option(
-    "--local", is_flag=True,
+    "--local",
+    is_flag=True,
     help="Save to local project config (./.model-forge/config.json).",
 )
 def add_model(
@@ -90,72 +92,81 @@ def add_model(
     api_model_name: str | None,
     api_key: str | None,
     dev_auth: bool,
-    local: bool
+    local: bool,
 ) -> None:
-    """Adds or updates a model configuration."""
-    target_config_path = (
-        config.get_config_path(local=True) if local else config.GLOBAL_CONFIG_FILE
-    )
-    current_config, _ = config.get_config_from_path(target_config_path)
+    """Add a new model configuration."""
+    try:
+        # Load existing configuration
+        target_config_path = config.get_config_path(local=local)
+        current_config, _ = config.get_config_from_path(target_config_path)
 
-    providers = current_config.setdefault("providers", {})
-    provider_data = providers.setdefault(provider, {"models": {}})
+        # Ensure providers section exists
+        if "providers" not in current_config:
+            current_config["providers"] = {}
 
-    # --- This is a simplified logic block. We can make this more robust later ---
-    if provider == "ollama":
-        provider_data["llm_type"] = "ollama"
-        # Use the environment variable if it exists, otherwise default to localhost.
-        provider_data["base_url"] = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        provider_data["auth_strategy"] = "local"
-    elif provider == "openai":
-        provider_data["llm_type"] = "openai_compatible"
-        provider_data["base_url"] = (
-            "https://api.openai.com/v1"  # Default OpenAI endpoint
+        # Initialize provider if it doesn't exist
+        if provider not in current_config["providers"]:
+            # Provider configuration defaults
+            provider_defaults = {
+                "openai": {
+                    "llm_type": "openai_compatible",
+                    "base_url": "https://api.openai.com/v1",
+                },
+                "google": {"llm_type": "google"},
+                "github_copilot": {"llm_type": "github_copilot"},
+                "ollama": {"llm_type": "ollama", "base_url": "http://localhost:11434"},
+            }
+
+            current_config["providers"][provider] = provider_defaults.get(provider, {})
+            current_config["providers"][provider]["models"] = {}
+
+        # Add the model
+        if "models" not in current_config["providers"][provider]:
+            current_config["providers"][provider]["models"] = {}
+
+        model_config = {}
+        if api_model_name:
+            model_config["api_model_name"] = api_model_name
+
+        current_config["providers"][provider]["models"][model] = model_config
+
+        # Save the configuration
+        config.save_config(current_config, local=local)
+
+        # Handle authentication
+        if api_key:
+            auth_strategy = auth.ApiKeyAuth(provider)
+            # Store the provided API key directly
+            import keyring
+
+            keyring.set_password(provider, f"{provider}_user", api_key)
+            click.echo(f"API key stored securely for provider '{provider}'.")
+        elif dev_auth:
+            click.echo("Starting device authentication flow...")
+            try:
+                auth_strategy = auth.get_auth_strategy(provider)
+                credentials = auth_strategy.authenticate()
+                if credentials:
+                    click.echo(f"Authentication successful for provider '{provider}'.")
+                else:
+                    click.echo("Authentication failed.", err=True)
+                    return
+            except Exception as e:
+                logger.exception("Device authentication failed")
+                click.echo(f"Device authentication failed: {e}", err=True)
+                return
+
+        # Success message
+        scope_msg = "local" if local else "global"
+        click.echo(
+            f"Successfully configured model '{model}' for provider '{provider}' "
+            f"in the {scope_msg} config."
         )
-        provider_data["auth_strategy"] = "api_key"
-    elif provider == "github_copilot":
-        provider_data["llm_type"] = "github_copilot"  # Use dedicated ChatGitHubCopilot
-        provider_data["base_url"] = "https://api.githubcopilot.com"
-        provider_data["auth_strategy"] = "device_flow"
-        provider_data["auth_details"] = {
-            "client_id": "01ab8ac9400c4e429b23",  # From VS Code's public source
-            "device_code_url": "https://github.com/login/device/code",
-            "token_url": "https://github.com/login/oauth/access_token",
-            "scope": "read:user",
-        }
-    elif provider == "google":
-        provider_data["llm_type"] = "google_genai"
-        provider_data["auth_strategy"] = "api_key"
-    elif api_key:
-        # This can be a generic API key provider in the future
-        click.echo(f"Error: Unsupported provider '{provider}' for API key auth.")
-        return
+        click.echo("Run 'modelforge config show' to see the updated configuration.")
 
-    model_config = {}
-    if api_model_name:
-        model_config["api_model_name"] = api_model_name
-
-    provider_data["models"][model] = model_config
-    config.save_config(current_config, local=local)
-
-    scope_msg = "local" if local else "global"
-    click.echo(
-        f"Successfully configured model '{model}' for provider '{provider}' in the {scope_msg} config."
-    )
-    click.echo("Run 'modelforge config show' to see the updated configuration.")
-
-    # Optionally, trigger authentication immediately
-    if dev_auth:
-        auth_handler = auth.DeviceFlowAuth(
-            provider_name=provider, **provider_data["auth_details"]
-        )
-        auth_handler.authenticate()
-    elif api_key:
-        auth_handler = auth.ApiKeyAuth(provider)
-        # We don't call authenticate() here because the key is already provided.
-        # We can store it directly.
-        keyring.set_password(provider, f"{provider}_user", api_key)
-        click.echo(f"API key for {provider} has been stored securely.")
+    except Exception as e:
+        logger.exception("Failed to add model configuration")
+        click.echo(f"Error: {e}", err=True)
 
 
 @config_group.command(name="use")
@@ -169,8 +180,10 @@ def add_model(
     "--local", is_flag=True, help="Set the current model in the local project config."
 )
 def use_model(provider_name: str, model_alias: str, local: bool) -> None:
-    """Sets the currently active model for testing."""
-    config.set_current_model(provider_name, model_alias, local=local)
+    """Set the current model to use."""
+    success = config.set_current_model(provider_name, model_alias, local=local)
+    if not success:
+        raise click.ClickException(f"Failed to set model {provider_name}/{model_alias}")
 
 
 @config_group.command(name="remove")
@@ -183,28 +196,16 @@ def use_model(provider_name: str, model_alias: str, local: bool) -> None:
 )
 @click.option("--local", is_flag=True, help="Remove from the local project config.")
 def remove_model(
-    provider: str,
-    model: str | None,
-    keep_credentials: bool,
-    local: bool
+    provider: str, model: str | None, keep_credentials: bool, local: bool
 ) -> None:
     """Removes a model configuration and optionally its stored credentials."""
-    target_config_path = (
-        config.get_config_path(local=True) if local else config.GLOBAL_CONFIG_FILE
-    )
+    target_config_path = config.get_config_path(local=local)
     current_config, _ = config.get_config_from_path(target_config_path)
-
-    if not _.exists():
-        scope = "local" if local else "global"
-        click.echo(
-            f"Error: {scope} configuration file does not exist at {target_config_path}."
-        )
-        return
 
     providers = current_config.get("providers", {})
 
     if provider not in providers:
-        click.echo(f"Error: Provider '{provider}' not found in configuration.")
+        click.echo(f"Error: Provider '{provider}' not found.")
         return
 
     provider_data = providers[provider]
@@ -249,6 +250,8 @@ def remove_model(
             removed_credentials = False
             for key in credential_keys:
                 try:
+                    import keyring
+
                     stored_credential = keyring.get_password(provider, key)
                     if stored_credential:
                         keyring.delete_password(provider, key)
@@ -256,7 +259,7 @@ def remove_model(
                         click.echo(f"Removed stored credentials for {provider}:{key}")
                 except Exception:
                     # Credential might not exist, continue
-                    pass
+                    logger.debug("Credential removal failed, continuing")
 
             if not removed_credentials:
                 click.echo("No stored credentials found to remove.")
@@ -272,7 +275,6 @@ def remove_model(
 @click.option("--verbose", is_flag=True, help="Enable verbose debug output.")
 def test_model(prompt: str, verbose: bool) -> None:
     """Tests the currently selected model with a prompt."""
-
     try:
         current_model = config.get_current_model()
         if not current_model:
@@ -319,7 +321,7 @@ def test_model(prompt: str, verbose: bool) -> None:
         click.echo(response)
 
     except Exception as e:
-        logger.exception("Error occurred while running model test: %s", str(e))
+        logger.exception("Error occurred while running model test")
         click.echo(f"\nAn error occurred while running the model: {e}", err=True)
 
 
@@ -327,20 +329,20 @@ def _invoke_with_smart_retry(
     chain: BaseChatModel,
     input_data: dict[str, Any],
     verbose: bool = False,
-    max_retries: int = 3
-) -> Any:
+    max_retries: int = 3,
+) -> str:
     """
     Invokes a LangChain model with smart retry logic for GitHub Copilot rate limits.
-    
+
     Args:
         chain: The LangChain model to invoke
         input_data: The input data to pass to the model
         verbose: Whether to show verbose output
         max_retries: Maximum number of retry attempts
-        
+
     Returns:
         The model response
-        
+
     Raises:
         ProviderError: If max retries are reached for rate limiting
         Exception: For non-rate-limit errors
@@ -355,7 +357,8 @@ def _invoke_with_smart_retry(
                 )
                 if verbose:
                     click.echo(
-                        f"🔄 Retry attempt {attempt + 1}/{max_retries} for GitHub Copilot..."
+                        f"🔄 Retry attempt {attempt + 1}/{max_retries} "
+                        f"for GitHub Copilot..."
                     )
 
             return chain.invoke(input_data)
@@ -371,7 +374,8 @@ def _invoke_with_smart_retry(
             ):
                 if attempt < max_retries - 1:  # Don't sleep on the last attempt
                     # Exponential backoff with jitter: 1s, 2s, 4s + random(0-1)
-                    delay = (2**attempt) + random.uniform(0, 1)
+                    # Note: Using random for non-cryptographic backoff delay
+                    delay = (2**attempt) + random.uniform(0, 1)  # noqa: S311
 
                     logger.warning(
                         "Rate limited by GitHub Copilot. Waiting %.1fs before retry",
@@ -379,7 +383,8 @@ def _invoke_with_smart_retry(
                     )
                     if verbose:
                         click.echo(
-                            f"⏳ Rate limited by GitHub Copilot. Waiting {delay:.1f}s before retry..."
+                            f"⏳ Rate limited by GitHub Copilot. "
+                            f"Waiting {delay:.1f}s before retry..."
                         )
 
                     time.sleep(delay)
@@ -390,11 +395,12 @@ def _invoke_with_smart_retry(
                 )
                 if verbose:
                     click.echo(
-                        f"❌ Max retries ({max_retries}) reached for GitHub Copilot rate limiting"
+                        f"❌ Max retries ({max_retries}) reached "
+                        f"for GitHub Copilot rate limiting"
                     )
             else:
                 # Non-rate-limit error, don't retry
-                logger.exception("Non-rate-limit error in GitHub Copilot call: %s", str(e))
+                logger.exception("Non-rate-limit error in GitHub Copilot call")
                 raise
 
     # If we get here, all retries failed
