@@ -104,7 +104,7 @@ class ModelForgeRegistry:
 
             if llm_type == "github_copilot":
                 return self._create_github_copilot_llm(
-                    provider_name, model_alias, provider_data, 
+                    provider_name, model_alias, provider_data,
                     model_data, auth_strategy_name
                 )
 
@@ -121,9 +121,7 @@ class ModelForgeRegistry:
             logger.error(
                 "Unsupported llm_type '%s' for provider '%s'", llm_type, provider_name
             )
-            raise ProviderError(
-                f"Unsupported llm_type '{llm_type}' for provider '{provider_name}'"
-            )
+            self._raise_provider_error()
 
         except Exception:
             logger.exception(
@@ -132,6 +130,9 @@ class ModelForgeRegistry:
                 model_alias,
             )
             raise
+
+    def _raise_provider_error(self) -> None:
+        raise ProviderError
 
     def _create_openai_compatible_llm(
         self,
@@ -162,14 +163,12 @@ class ModelForgeRegistry:
             logger.error(
                 "Could not retrieve credentials for provider: %s", provider_name
             )
-            raise ProviderError(
-                f"Could not retrieve credentials for provider '{provider_name}'"
-            )
+            raise ProviderError
 
         api_key = credentials.get("access_token") or credentials.get("api_key")
         if not api_key:
             logger.error("Could not find token or key for provider: %s", provider_name)
-            raise ProviderError(f"Could not find token or key for '{provider_name}'")
+            raise ProviderError
 
         # Debug information (only if verbose)
         actual_model_name = model_data.get("api_model_name", model_alias)
@@ -227,18 +226,14 @@ class ModelForgeRegistry:
             logger.error(
                 "Could not retrieve credentials for provider: %s", provider_name
             )
-            raise ProviderError(
-                f"Could not retrieve credentials for provider '{provider_name}'"
-            )
+            raise ProviderError
 
         access_token = credentials.get("access_token")
         if not access_token:
             logger.error(
                 "Could not find access token for provider: %s", provider_name
             )
-            raise ProviderError(
-                f"Could not find access token for '{provider_name}'"
-            )
+            raise ProviderError
 
         # Debug information (only if verbose)
         actual_model_name = model_data.get("api_model_name", model_alias)
@@ -269,16 +264,14 @@ class ModelForgeRegistry:
             logger.error(
                 "Could not retrieve credentials for provider: %s", provider_name
             )
-            raise ProviderError(
-                f"Could not retrieve credentials for provider '{provider_name}'"
-            )
+            raise ProviderError
 
         api_key = credentials.get("api_key")
         if not api_key:
             logger.error(
                 "Could not find API key for provider: %s", provider_name
             )
-            raise ProviderError(f"Could not find API key for '{provider_name}'")
+            raise ProviderError
 
         return ChatGoogleGenerativeAI(
             model=model_data.get("api_model_name", model_alias),

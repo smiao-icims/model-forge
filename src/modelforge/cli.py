@@ -6,6 +6,7 @@ from typing import Any
 
 # Third-party imports
 import click
+import keyring
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -23,8 +24,6 @@ def _handle_authentication(provider: str, api_key: str | None, dev_auth: bool) -
     if api_key:
         auth_strategy = auth.ApiKeyAuth(provider)
         # Store the provided API key directly
-        import keyring
-
         keyring.set_password(provider, f"{provider}_user", api_key)
         click.echo(f"API key stored securely for provider '{provider}'.")
     elif dev_auth:
@@ -184,7 +183,7 @@ def use_model(provider_name: str, model_alias: str, local: bool) -> None:
     """Set the current model to use."""
     success = config.set_current_model(provider_name, model_alias, local=local)
     if not success:
-        raise click.ClickException("Failed to set model")
+        raise click.ClickException
 
 
 @config_group.command(name="remove")
@@ -251,8 +250,6 @@ def remove_model(
             removed_credentials = False
             for key in credential_keys:
                 try:
-                    import keyring
-
                     stored_credential = keyring.get_password(provider, key)
                     if stored_credential:
                         keyring.delete_password(provider, key)

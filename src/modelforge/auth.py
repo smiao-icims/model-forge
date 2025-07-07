@@ -107,7 +107,7 @@ class DeviceFlowAuth(AuthStrategy):
                 "Network error requesting device code from %s",
                 self.provider_name,
             )
-            raise AuthenticationError("Network error") from e
+            raise AuthenticationError from e
 
         logger.info("Device code obtained for %s", self.provider_name)
 
@@ -142,7 +142,7 @@ class DeviceFlowAuth(AuthStrategy):
                 "Invalid response from %s device code endpoint",
                 self.provider_name,
             )
-            raise AuthenticationError("Invalid response") from e
+            raise AuthenticationError from e
         except requests.exceptions.HTTPError as e:
             # Check if this is a recoverable error
             try:
@@ -152,20 +152,18 @@ class DeviceFlowAuth(AuthStrategy):
                     self.provider_name,
                     error_info.get("error"),
                 )
-                raise AuthenticationError("Authentication failed") from e
+                raise AuthenticationError from e
             except requests.exceptions.JSONDecodeError:
                 logger.exception(
                     "HTTP error while polling for token from %s", self.provider_name
                 )
-                raise AuthenticationError("HTTP error") from e
+                raise AuthenticationError from e
         except requests.exceptions.RequestException as e:
             logger.exception(
                 "Network error while polling for token from %s",
                 self.provider_name,
             )
-            raise AuthenticationError(
-                f"Network error while polling for token from {self.provider_name}"
-            ) from e
+            raise AuthenticationError from e
 
     def _poll_for_token(
         self, device_code_data: dict[str, Any]
@@ -193,9 +191,7 @@ class DeviceFlowAuth(AuthStrategy):
                     "Invalid JSON response while polling for token from %s",
                     self.provider_name,
                 )
-                raise AuthenticationError(
-                    f"Invalid response from {self.provider_name} token endpoint"
-                ) from e
+                raise AuthenticationError from e
             except requests.exceptions.HTTPError as e:
                 # Check if this is a recoverable error
                 try:
@@ -205,25 +201,18 @@ class DeviceFlowAuth(AuthStrategy):
                         self.provider_name,
                         error_info.get("error"),
                     )
-                    raise AuthenticationError(
-                        f"Authentication failed for {self.provider_name}: "
-                        f"{error_info.get('error_description', 'Unknown error')}"
-                    ) from e
+                    raise AuthenticationError from e
                 except requests.exceptions.JSONDecodeError:
                     logger.exception(
                         "HTTP error while polling for token from %s", self.provider_name
                     )
-                    raise AuthenticationError(
-                        f"HTTP error while polling for token from {self.provider_name}"
-                    ) from e
+                    raise AuthenticationError from e
             except requests.exceptions.RequestException as e:
                 logger.exception(
                     "Network error while polling for token from %s",
                     self.provider_name,
                 )
-                raise AuthenticationError(
-                    f"Network error while polling for token from {self.provider_name}"
-                ) from e
+                raise AuthenticationError from e
 
             if "access_token" in token_data:
                 # Success! Store the token
@@ -280,9 +269,7 @@ class DeviceFlowAuth(AuthStrategy):
                     self.provider_name,
                     error_desc,
                 )
-                raise AuthenticationError(
-                    f"Failed to get access token for {self.provider_name}: {error_desc}"
-                )
+                raise AuthenticationError
 
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored token from keyring."""
