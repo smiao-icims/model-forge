@@ -19,7 +19,9 @@ from .registry import ModelForgeRegistry
 logger = get_logger(__name__)
 
 
-def _handle_authentication(provider: str, api_key: str | None, dev_auth: bool) -> None:
+def _handle_authentication(
+    provider: str, provider_data: dict[str, Any], api_key: str | None, dev_auth: bool
+) -> None:
     """Handle authentication for provider configuration."""
     if api_key:
         auth_strategy = auth.ApiKeyAuth(provider)
@@ -29,7 +31,7 @@ def _handle_authentication(provider: str, api_key: str | None, dev_auth: bool) -
     elif dev_auth:
         click.echo("Starting device authentication flow...")
         try:
-            auth_strategy = auth.get_auth_strategy(provider)
+            auth_strategy = auth.get_auth_strategy(provider, provider_data)
             credentials = auth_strategy.authenticate()
             if credentials:
                 click.echo(f"Authentication successful for provider '{provider}'.")
@@ -154,7 +156,9 @@ def add_model(
         config.save_config(current_config, local=local)
 
         # Handle authentication
-        _handle_authentication(provider, api_key, dev_auth)
+        _handle_authentication(
+            provider, current_config["providers"][provider], api_key, dev_auth
+        )
 
         # Success message
         scope_msg = "local" if local else "global"
@@ -364,7 +368,7 @@ def _check_provider_status(
         return
 
     try:
-        auth_strategy = auth.get_auth_strategy(provider_name)
+        auth_strategy = auth.get_auth_strategy(provider_name, provider_data)
         credentials = auth_strategy.get_credentials()
 
         if credentials:

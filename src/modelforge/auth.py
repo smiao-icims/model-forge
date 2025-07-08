@@ -78,11 +78,10 @@ class ApiKeyAuth(AuthStrategy):
             logger.info("Cleared stored API key for %s.", self.provider_name)
         except keyring.errors.PasswordDeleteError:
             logger.debug("No stored API key to clear for %s.", self.provider_name)
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "An unexpected error occurred while clearing API key for %s: %s",
+                "An unexpected error occurred while clearing API key for %s",
                 self.provider_name,
-                e,
             )
 
 
@@ -233,12 +232,13 @@ class DeviceFlowAuth(AuthStrategy):
                         continue
                     if error_code in ("expired_token", "access_denied"):
                         # Unrecoverable error, stop polling
-                        logger.error(
+                        logger.exception(
                             "Unrecoverable error from %s: %s",
                             self.provider_name,
                             error_code,
                         )
-                        raise AuthenticationError(f"Authentication failed: {error_code}") from e
+                        msg = f"Authentication failed: {error_code}"
+                        raise AuthenticationError(msg) from e
                 except (requests.exceptions.JSONDecodeError, KeyError):
                     logger.exception(
                         "Unexpected error format from %s", self.provider_name
@@ -252,7 +252,9 @@ class DeviceFlowAuth(AuthStrategy):
                 raise AuthenticationError from e
 
             if "access_token" in token_data:
-                logger.info("Successfully obtained access token for %s", self.provider_name)
+                logger.info(
+                    "Successfully obtained access token for %s", self.provider_name
+                )
                 self._save_token_info(token_data)
                 return token_data
 
@@ -271,7 +273,8 @@ class DeviceFlowAuth(AuthStrategy):
             logger.info("Successfully saved token for %s", self.provider_name)
         except Exception:
             logger.exception("Failed to save token for %s", self.provider_name)
-            raise ConfigurationError("Could not save token information securely.") from None
+            msg = "Could not save token information securely."
+            raise ConfigurationError(msg) from None
 
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored token info. If expired, try to refresh."""
@@ -329,11 +332,10 @@ class DeviceFlowAuth(AuthStrategy):
             self._save_token_info(new_token_data)
             logger.info("Successfully refreshed token for %s", self.provider_name)
             return new_token_data
-        except requests.exceptions.RequestException as e:
-            logger.error(
-                "Failed to refresh token for %s. Re-authentication will be required. Error: %s",
+        except requests.exceptions.RequestException:
+            logger.exception(
+                "Failed to refresh token for %s. Re-authentication will be required.",
                 self.provider_name,
-                e,
             )
             self.clear_credentials()
             return None
@@ -356,11 +358,10 @@ class DeviceFlowAuth(AuthStrategy):
             logger.info("Cleared stored token for %s.", self.provider_name)
         except keyring.errors.PasswordDeleteError:
             logger.debug("No stored token to clear for %s.", self.provider_name)
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "An unexpected error occurred while clearing token for %s: %s",
+                "An unexpected error occurred while clearing token for %s",
                 self.provider_name,
-                e,
             )
 
 
@@ -384,7 +385,8 @@ def get_auth_strategy(
         ConfigurationError: If the provider is not found or misconfigured.
     """
     if not provider_data:
-        raise ConfigurationError(f"Provider '{provider_name}' not found in configuration.")
+        msg = f"Provider '{provider_name}' not found in configuration."
+        raise ConfigurationError(msg)
 
     strategy_name = provider_data.get("auth_strategy")
     if not strategy_name:
@@ -396,9 +398,11 @@ def get_auth_strategy(
     if strategy_name == "device_flow":
         auth_details = provider_data.get("auth_details")
         if not auth_details:
-            raise ConfigurationError(
-                f"Provider '{provider_name}' is missing required device flow settings."
+            msg = (
+                f"Provider '{provider_name}' is missing required "
+                "device flow settings."
             )
+            raise ConfigurationError(msg)
 
         return DeviceFlowAuth(
             provider_name,
@@ -408,9 +412,8 @@ def get_auth_strategy(
             auth_details["scope"],
         )
 
-    raise ConfigurationError(
-        f"Unknown auth strategy '{strategy_name}' for provider '{provider_name}'."
-    )
+    msg = f"Unknown auth strategy '{strategy_name}' for provider '{provider_name}'."
+    raise ConfigurationError(msg)
 
 
 def get_credentials(
@@ -441,11 +444,13 @@ def get_credentials(
         )
         return strategy.authenticate()
 
-    except (ConfigurationError, AuthenticationError) as e:
-        logger.error("Authentication failed for %s: %s", provider_name, e)
+    except (ConfigurationError, AuthenticationError):
+        logger.exception("Authentication failed for %s", provider_name)
         return None
-    except Exception as e:
-        logger.exception("An unexpected error occurred during authentication for %s", provider_name)
+    except Exception:
+        logger.exception(
+            "An unexpected error occurred during authentication for %s", provider_name
+        )
         return None
 
 
@@ -462,4 +467,3 @@ class NoAuth(AuthStrategy):
 
     def clear_credentials(self) -> None:
         """No credentials to clear."""
-        pass

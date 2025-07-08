@@ -83,7 +83,20 @@ def test_get_llm_openai_compatible_success(mocker: MockerFixture) -> None:
 
     # Assert
     assert llm_instance is not None
-    mock_get_credentials.assert_called_once_with("openai", "gpt-4o-mini", verbose=False)
+    mock_get_credentials.assert_called_once_with(
+        "openai",
+        "gpt-4o-mini",
+        {
+            "llm_type": "openai_compatible",
+            "base_url": "https://api.openai.com/v1",
+            "models": {
+                "gpt-4o-mini": {
+                    "api_model_name": "gpt-4o-mini",
+                }
+            },
+        },
+        verbose=False,
+    )
     mock_chat_openai.assert_called_once_with(
         model_name="gpt-4o-mini",
         api_key="test-api-key-123",
