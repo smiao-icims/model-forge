@@ -366,24 +366,23 @@ class DeviceFlowAuth(AuthStrategy):
 
 def get_auth_strategy(
     provider_name: str,
+    provider_data: dict[str, Any],
     model_alias: str | None = None,  # noqa: ARG001
 ) -> AuthStrategy:
     """
     Factory function to get the correct authentication strategy for a provider.
+
     Args:
         provider_name: The name of the provider.
+        provider_data: The configuration data for the provider.
         model_alias: The model alias (currently unused but for future use).
+
     Returns:
         An instance of an AuthStrategy subclass.
+
     Raises:
         ConfigurationError: If the provider is not found or misconfigured.
     """
-    from . import config  # Late import to avoid circular dependency
-
-    # Get the merged configuration
-    providers_config, _ = config.get_config()
-    provider_data = providers_config.get("providers", {}).get(provider_name)
-
     if not provider_data:
         raise ConfigurationError(f"Provider '{provider_name}' not found in configuration.")
 
@@ -395,18 +394,18 @@ def get_auth_strategy(
         return ApiKeyAuth(provider_name)
 
     if strategy_name == "device_flow":
-        client_id = provider_data.get("client_id")
-        device_code_url = provider_data.get("device_code_url")
-        token_url = provider_data.get("token_url")
-        scope = provider_data.get("scope")
-
-        if not all([client_id, device_code_url, token_url, scope]):
+        auth_details = provider_data.get("auth_details")
+        if not auth_details:
             raise ConfigurationError(
                 f"Provider '{provider_name}' is missing required device flow settings."
             )
 
         return DeviceFlowAuth(
-            provider_name, client_id, device_code_url, token_url, scope
+            provider_name,
+            auth_details["client_id"],
+            auth_details["device_code_url"],
+            auth_details["token_url"],
+            auth_details["scope"],
         )
 
     raise ConfigurationError(
@@ -415,7 +414,10 @@ def get_auth_strategy(
 
 
 def get_credentials(
-    provider_name: str, model_alias: str, verbose: bool = False
+    provider_name: str,
+    model_alias: str,
+    provider_data: dict[str, Any],
+    verbose: bool = False,
 ) -> dict[str, Any] | None:
     """
     Get credentials for a given provider and model.
@@ -427,7 +429,7 @@ def get_credentials(
         logger.setLevel("DEBUG")
 
     try:
-        strategy = get_auth_strategy(provider_name, model_alias)
+        strategy = get_auth_strategy(provider_name, provider_data, model_alias)
         creds = strategy.get_credentials()
         if creds:
             logger.info("Successfully retrieved credentials for %s", provider_name)

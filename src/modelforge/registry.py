@@ -201,7 +201,7 @@ class ModelForgeRegistry:
             )
 
         credentials = auth.get_credentials(
-            provider_name, model_alias, verbose=self.verbose
+            provider_name, model_alias, provider_data, verbose=self.verbose
         )
         if not credentials or "access_token" not in credentials:
             raise ProviderError(f"Could not get valid credentials for {provider_name}")
@@ -215,7 +215,7 @@ class ModelForgeRegistry:
             logger.debug("   Model alias: %s", model_alias)
             logger.debug("   Actual model name: %s", actual_model_name)
 
-        return ChatGitHubCopilot(copilot_token=copilot_token, model=actual_model_name)
+        return ChatGitHubCopilot(api_key=copilot_token, model=actual_model_name)
 
     def _create_google_genai_llm(
         self,
@@ -226,7 +226,7 @@ class ModelForgeRegistry:
     ) -> ChatGoogleGenerativeAI:
         """Create ChatGoogleGenerativeAI instance."""
         credentials = auth.get_credentials(
-            provider_name, model_alias, verbose=self.verbose
+            provider_name, model_alias, provider_data, verbose=self.verbose
         )
         if not credentials or "api_key" not in credentials:
             raise ProviderError(f"API key not found for {provider_name}")
