@@ -6,7 +6,6 @@ from typing import Any
 
 # Third-party imports
 import click
-import keyring
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -25,9 +24,9 @@ def _handle_authentication(
     """Handle authentication for provider configuration."""
     if api_key:
         auth_strategy = auth.ApiKeyAuth(provider)
-        # Store the provided API key directly
-        keyring.set_password(provider, f"{provider}_user", api_key)
-        click.echo(f"API key stored securely for provider '{provider}'.")
+        # Store the provided API key using the new config-based approach
+        auth_strategy._save_auth_data({"api_key": api_key})
+        click.echo(f"API key stored for provider '{provider}'.")
     elif dev_auth:
         click.echo("Starting device authentication flow...")
         try:
@@ -133,9 +132,23 @@ def add_model(
                 "openai": {
                     "llm_type": "openai_compatible",
                     "base_url": "https://api.openai.com/v1",
+                    "auth_strategy": "api_key",
                 },
-                "google": {"llm_type": "google"},
-                "github_copilot": {"llm_type": "github_copilot"},
+                "google": {
+                    "llm_type": "google_genai",
+                    "auth_strategy": "api_key",
+                },
+                "github_copilot": {
+                    "llm_type": "github_copilot",
+                    "base_url": "https://api.githubcopilot.com",
+                    "auth_strategy": "device_flow",
+                    "auth_details": {
+                        "client_id": "01ab8ac9400c4e429b23",
+                        "device_code_url": "https://github.com/login/device/code",
+                        "token_url": "https://github.com/login/oauth/access_token",
+                        "scope": "read:user",
+                    },
+                },
                 "ollama": {"llm_type": "ollama", "base_url": "http://localhost:11434"},
             }
 
@@ -196,7 +209,7 @@ def use_model(provider_name: str, model_alias: str, local: bool) -> None:
 @click.option(
     "--keep-credentials",
     is_flag=True,
-    help="Keep stored credentials (don't remove from keyring).",
+    help="Keep stored credentials (don't remove from config).",
 )
 @click.option("--local", is_flag=True, help="Remove from the local project config.")
 def remove_model(
@@ -244,30 +257,14 @@ def remove_model(
     # Remove stored credentials unless explicitly kept
     if not keep_credentials:
         try:
-            # Try different credential storage patterns
-            credential_keys = [
-                f"{provider}_{model}",
-                f"{provider}:{model}",
-                f"{provider}_user",
-            ]
-
-            removed_credentials = False
-            for key in credential_keys:
-                try:
-                    stored_credential = keyring.get_password(provider, key)
-                    if stored_credential:
-                        keyring.delete_password(provider, key)
-                        removed_credentials = True
-                        click.echo(f"Removed stored credentials for {provider}:{key}")
-                except Exception:
-                    # Credential might not exist, continue
-                    logger.debug("Credential removal failed, continuing")
-
-            if not removed_credentials:
-                click.echo("No stored credentials found to remove.")
-
+            # Clear auth data from config file
+            auth_strategy = auth.get_auth_strategy(
+                provider, current_config["providers"][provider]
+            )
+            auth_strategy.clear_credentials()
+            click.echo(f"Removed stored credentials for {provider}")
         except Exception as e:
-            click.echo(f"Warning: Could not remove credentials from keyring: {e}")
+            click.echo(f"Warning: Could not remove credentials from config: {e}")
     else:
         click.echo("Kept stored credentials (--keep-credentials flag used).")
 

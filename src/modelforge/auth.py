@@ -1,15 +1,14 @@
 """Authentication strategies for ModelForge providers."""
 
 import getpass
-import json
 import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import keyring
 import requests
 
+from .config import get_config, save_config
 from .exceptions import AuthenticationError, ConfigurationError
 from .logging_config import get_logger
 
@@ -38,46 +37,74 @@ class AuthStrategy(ABC):
     def clear_credentials(self) -> None:
         """Clear any stored credentials for the provider."""
 
+    def _get_auth_data(self) -> dict[str, Any]:
+        """Get authentication data from config file."""
+        config_data, _ = get_config()
+        providers = config_data.get("providers", {})
+        provider_data = providers.get(self.provider_name, {})
+        return provider_data.get("auth_data", {})
+
+    def _save_auth_data(self, auth_data: dict[str, Any]) -> None:
+        """Save authentication data to config file."""
+        config_data, _ = get_config()
+
+        # Ensure providers section exists
+        if "providers" not in config_data:
+            config_data["providers"] = {}
+
+        # Ensure provider section exists
+        if self.provider_name not in config_data["providers"]:
+            config_data["providers"][self.provider_name] = {}
+
+        # Store auth data
+        config_data["providers"][self.provider_name]["auth_data"] = auth_data
+
+        # Save config
+        save_config(config_data)
+        logger.info("Successfully saved auth data for %s", self.provider_name)
+
+    def _clear_auth_data(self) -> None:
+        """Clear authentication data from config file."""
+        config_data, _ = get_config()
+        providers = config_data.get("providers", {})
+
+        if self.provider_name in providers:
+            providers[self.provider_name].pop("auth_data", None)
+            save_config(config_data)
+            logger.info("Cleared stored auth data for %s", self.provider_name)
+
 
 class ApiKeyAuth(AuthStrategy):
     """API key authentication strategy."""
 
     def authenticate(self) -> dict[str, Any] | None:
-        """Prompt for API key and store it securely."""
+        """Prompt for API key and store it in config."""
         api_key = getpass.getpass(f"Enter API key for {self.provider_name}: ")
         if api_key:
-            # Store the API key in the keyring
-            keyring.set_password(
-                self.provider_name, f"{self.provider_name}_user", api_key
-            )
-            logger.info("API key stored securely for %s", self.provider_name)
-            return {"api_key": api_key}
+            auth_data = {"api_key": api_key}
+            self._save_auth_data(auth_data)
+            logger.info("API key stored for %s", self.provider_name)
+            return auth_data
         logger.warning("No API key provided for %s", self.provider_name)
         return None
 
     def get_credentials(self) -> dict[str, Any] | None:
-        """Retrieve stored API key from keyring."""
+        """Retrieve stored API key from config."""
         try:
-            api_key = keyring.get_password(
-                self.provider_name, f"{self.provider_name}_user"
-            )
-            if api_key:
+            auth_data = self._get_auth_data()
+            if auth_data and "api_key" in auth_data:
                 logger.debug("Retrieved API key for %s", self.provider_name)
-                return {"api_key": api_key}
+                return auth_data
+            logger.warning("No stored API key found for %s", self.provider_name)
+            return None
         except Exception:
             logger.exception("Failed to retrieve API key for %s", self.provider_name)
             return None
-        else:
-            logger.warning("No stored API key found for %s", self.provider_name)
-            return None
 
     def clear_credentials(self) -> None:
-        """Clear stored API key from keyring."""
+        """Clear stored API key from config."""
         try:
-            keyring.delete_password(self.provider_name, f"{self.provider_name}_user")
-            logger.info("Cleared stored API key for %s.", self.provider_name)
-        except keyring.errors.PasswordDeleteError:
-            logger.debug("No stored API key to clear for %s.", self.provider_name)
+            self._clear_auth_data()
         except Exception:
             logger.exception(
                 "An unexpected error occurred while clearing API key for %s",
@@ -259,7 +286,7 @@ class DeviceFlowAuth(AuthStrategy):
                 return token_data
 
     def _save_token_info(self, token_data: dict[str, Any]) -> None:
-        """Save token information to keyring."""
+        """Save token information to config file."""
         # Calculate expiry time and add to token_data
         if "expires_in" in token_data:
             expires_in = token_data["expires_in"]
@@ -267,13 +294,10 @@ class DeviceFlowAuth(AuthStrategy):
             token_data["expires_at"] = expires_at.isoformat()
 
         try:
-            keyring.set_password(
-                self.provider_name, "token_info", json.dumps(token_data)
-            )
-            logger.info("Successfully saved token for %s", self.provider_name)
+            self._save_auth_data(token_data)
         except Exception:
             logger.exception("Failed to save token for %s", self.provider_name)
-            msg = "Could not save token information securely."
+            msg = "Could not save token information."
             raise ConfigurationError(msg) from None
 
     def get_credentials(self) -> dict[str, Any] | None:
@@ -341,23 +365,18 @@ class DeviceFlowAuth(AuthStrategy):
             return None
 
     def get_token_info(self) -> dict[str, Any] | None:
-        """Retrieve token information from keyring."""
+        """Retrieve token information from config file."""
         try:
-            stored_token = keyring.get_password(self.provider_name, "token_info")
-            if stored_token:
-                return json.loads(stored_token)
-            return None
+            auth_data = self._get_auth_data()
+            return auth_data if auth_data else None
         except Exception:
             logger.exception("Could not retrieve token for %s", self.provider_name)
             return None
 
     def clear_credentials(self) -> None:
-        """Clear stored token from keyring."""
+        """Clear stored token from config file."""
         try:
-            keyring.delete_password(self.provider_name, "token_info")
-            logger.info("Cleared stored token for %s.", self.provider_name)
-        except keyring.errors.PasswordDeleteError:
-            logger.debug("No stored token to clear for %s.", self.provider_name)
+            self._clear_auth_data()
         except Exception:
             logger.exception(
                 "An unexpected error occurred while clearing token for %s",
