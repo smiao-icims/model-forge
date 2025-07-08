@@ -108,7 +108,10 @@ def test_device_flow_auth_success(mock_keyring: Mock, mock_requests: Mock) -> No
     # Assert
     assert mock_requests.post.call_count == 3
     mock_keyring.set_password.assert_called_once()
-    assert credentials == {"access_token": "test-access-token"}
+    assert credentials is not None
+    assert credentials["access_token"] == "test-access-token"
+    assert "expires_at" in credentials
+    assert "expires_in" in credentials
 
 
 def test_device_flow_get_credentials_valid_token(mock_keyring: Mock) -> None:
@@ -133,7 +136,9 @@ def test_device_flow_get_credentials_valid_token(mock_keyring: Mock) -> None:
     credentials = auth_strategy.get_credentials()
 
     # Assert
-    assert credentials == {"access_token": "valid-token"}
+    assert credentials is not None
+    assert credentials["access_token"] == "valid-token"
+    assert "expires_at" in credentials
 
 
 def test_device_flow_get_credentials_expired_token(mock_keyring: Mock) -> None:

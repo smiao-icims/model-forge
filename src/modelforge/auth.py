@@ -21,7 +21,6 @@ class AuthStrategy(ABC):
 
     def __init__(self, provider_name: str) -> None:
         """Initialize the authentication strategy.
-
         Args:
             provider_name: The name of the provider this strategy is for
         """
@@ -34,6 +33,10 @@ class AuthStrategy(ABC):
     @abstractmethod
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored credentials."""
+
+    @abstractmethod
+    def clear_credentials(self) -> None:
+        """Clear any stored credentials for the provider."""
 
 
 class ApiKeyAuth(AuthStrategy):
@@ -68,6 +71,20 @@ class ApiKeyAuth(AuthStrategy):
             logger.warning("No stored API key found for %s", self.provider_name)
             return None
 
+    def clear_credentials(self) -> None:
+        """Clear stored API key from keyring."""
+        try:
+            keyring.delete_password(self.provider_name, f"{self.provider_name}_user")
+            logger.info("Cleared stored API key for %s.", self.provider_name)
+        except keyring.errors.PasswordDeleteError:
+            logger.debug("No stored API key to clear for %s.", self.provider_name)
+        except Exception as e:
+            logger.exception(
+                "An unexpected error occurred while clearing API key for %s: %s",
+                self.provider_name,
+                e,
+            )
+
 
 class DeviceFlowAuth(AuthStrategy):
     """OAuth device flow authentication strategy."""
@@ -81,7 +98,6 @@ class DeviceFlowAuth(AuthStrategy):
         scope: str,
     ) -> None:
         """Initialize device flow authentication.
-
         Args:
             provider_name: The name of the provider
             client_id: OAuth client ID
@@ -201,10 +217,31 @@ class DeviceFlowAuth(AuthStrategy):
                         self.provider_name,
                         error_info.get("error"),
                     )
-                    raise AuthenticationError from e
-                except requests.exceptions.JSONDecodeError:
+                    error_code = error_info.get("error")
+                    if error_code == "authorization_pending":
+                        # This is expected, continue polling
+                        continue
+                    if error_code == "slow_down":
+                        # Increase interval and continue
+                        new_interval = device_code_data.get("interval", 5) + 5
+                        device_code_data["interval"] = new_interval
+                        logger.info(
+                            "Slowing down polling to %s seconds for %s",
+                            new_interval,
+                            self.provider_name,
+                        )
+                        continue
+                    if error_code in ("expired_token", "access_denied"):
+                        # Unrecoverable error, stop polling
+                        logger.error(
+                            "Unrecoverable error from %s: %s",
+                            self.provider_name,
+                            error_code,
+                        )
+                        raise AuthenticationError(f"Authentication failed: {error_code}") from e
+                except (requests.exceptions.JSONDecodeError, KeyError):
                     logger.exception(
-                        "HTTP error while polling for token from %s", self.provider_name
+                        "Unexpected error format from %s", self.provider_name
                     )
                     raise AuthenticationError from e
             except requests.exceptions.RequestException as e:
@@ -215,157 +252,116 @@ class DeviceFlowAuth(AuthStrategy):
                 raise AuthenticationError from e
 
             if "access_token" in token_data:
-                # Success! Store the token
-                expires_in = token_data.get("expires_in", 28800)  # Default to 8 hours
-                token_info = {
-                    "access_token": token_data["access_token"],
-                    "expires_in": expires_in,
-                    "expires_at": (
-                        datetime.now(UTC) + timedelta(seconds=expires_in)
-                    ).isoformat(),
-                    "acquired_at": datetime.now(UTC).isoformat(),
-                    "scope": token_data.get("scope", self.scope),
-                }
+                logger.info("Successfully obtained access token for %s", self.provider_name)
+                self._save_token_info(token_data)
+                return token_data
 
-                try:
-                    # Store as JSON in keyring for structured data
-                    keyring.set_password(
-                        self.provider_name,
-                        f"{self.provider_name}_user",
-                        json.dumps(token_info),
-                    )
-                    logger.info(
-                        "Access token stored successfully for %s", self.provider_name
-                    )
-                    print(
-                        f"Successfully authenticated and stored token for "
-                        f"{self.provider_name}."
-                    )
-                    return {"access_token": token_data["access_token"]}
-                except Exception as e:
-                    logger.exception("Failed to store token for %s", self.provider_name)
-                    raise AuthenticationError(
-                        f"Failed to store token for {self.provider_name}"
-                    ) from e
-            elif token_data.get("error") == "authorization_pending":
-                logger.debug(
-                    "Authorization still pending for %s, continuing to poll",
-                    self.provider_name,
-                )
-                continue  # Continue polling
-            elif token_data.get("error") == "slow_down":
-                logger.debug(
-                    "Rate limited, slowing down polling for %s", self.provider_name
-                )
-                time.sleep(5)  # Add extra delay for rate limiting
-                continue
-            else:
-                # Error occurred
-                error_desc = token_data.get(
-                    "error_description", token_data.get("error", "Unknown error")
-                )
-                logger.error(
-                    "Authentication failed for %s: %s",
-                    self.provider_name,
-                    error_desc,
-                )
-                raise AuthenticationError
+    def _save_token_info(self, token_data: dict[str, Any]) -> None:
+        """Save token information to keyring."""
+        # Calculate expiry time and add to token_data
+        if "expires_in" in token_data:
+            expires_in = token_data["expires_in"]
+            expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
+            token_data["expires_at"] = expires_at.isoformat()
+
+        try:
+            keyring.set_password(
+                self.provider_name, "token_info", json.dumps(token_data)
+            )
+            logger.info("Successfully saved token for %s", self.provider_name)
+        except Exception:
+            logger.exception("Failed to save token for %s", self.provider_name)
+            raise ConfigurationError("Could not save token information securely.") from None
 
     def get_credentials(self) -> dict[str, Any] | None:
-        """Retrieve stored token from keyring."""
+        """Retrieve stored token info. If expired, try to refresh."""
+        token_info = self.get_token_info()
+        if not token_info:
+            logger.debug("No token info found for %s.", self.provider_name)
+            return None
+
+        # Check for expiry, with a 60-second buffer
+        expires_at_str = token_info.get("expires_at")
+        if not expires_at_str:
+            logger.warning(
+                "Token for %s has no expiration info. Assuming it's valid.",
+                self.provider_name,
+            )
+            return token_info
+
+        expires_at = datetime.fromisoformat(expires_at_str)
+        if datetime.now(UTC) >= (expires_at - timedelta(seconds=60)):
+            logger.info(
+                "Access token for %s is expired or nearing expiry. Attempting refresh.",
+                self.provider_name,
+            )
+            return self._refresh_token()
+
+        logger.debug("Access token for %s is still valid.", self.provider_name)
+        return token_info
+
+    def _refresh_token(self) -> dict[str, Any] | None:
+        """Use a refresh token to get a new access token."""
+        token_info = self.get_token_info()
+        if not token_info or "refresh_token" not in token_info:
+            logger.warning(
+                "No refresh token found for %s. Cannot refresh.", self.provider_name
+            )
+            return None
+
+        logger.info("Attempting to refresh token for %s", self.provider_name)
+        payload = {
+            "client_id": self.client_id,
+            "refresh_token": token_info["refresh_token"],
+            "grant_type": "refresh_token",
+        }
+        headers = {"Accept": "application/json"}
         try:
-            stored_data = keyring.get_password(
-                self.provider_name, f"{self.provider_name}_user"
+            response = requests.post(
+                self.token_url, data=payload, headers=headers, timeout=30
             )
-            if not stored_data:
-                logger.debug("No stored token found for %s", self.provider_name)
-                return None
+            response.raise_for_status()
+            new_token_data = response.json()
 
-            # Try to parse as JSON (new format)
-            try:
-                token_info = json.loads(stored_data)
-                if "expires_at" in token_info:
-                    expiry_time = datetime.fromisoformat(
-                        token_info["expires_at"].replace("Z", "+00:00")
-                    )
-                    # Add 5-minute buffer for token expiration
-                    buffer_time = expiry_time - timedelta(minutes=5)
+            if "refresh_token" not in new_token_data:
+                new_token_data["refresh_token"] = token_info["refresh_token"]
 
-                    if datetime.now(UTC) >= buffer_time:
-                        logger.warning(
-                            "Token for %s is expired or expiring soon",
-                            self.provider_name,
-                        )
-                        print(
-                            f"Token for {self.provider_name} is expired or expiring "
-                            f"soon. Please re-authenticate."
-                        )
-                        print(
-                            f"Run: modelforge config add --provider "
-                            f"{self.provider_name} --model <model> --dev-auth"
-                        )
-                        return None
-
-                    logger.debug("Valid token found for %s", self.provider_name)
-                    return {"access_token": token_info["access_token"]}
-
-            except (json.JSONDecodeError, KeyError):
-                # Fallback to old format (plain string token)
-                if stored_data.startswith(("gho_", "ghr_")):
-                    logger.warning(
-                        "Legacy token format detected for %s. "
-                        "Consider re-authenticating",
-                        self.provider_name,
-                    )
-                    print(
-                        f"Warning: Legacy token format detected for "
-                        f"{self.provider_name}. Consider re-authenticating for "
-                        f"better expiration handling."
-                    )
-                    return {"access_token": stored_data}
-
-                logger.warning("Invalid token format for %s", self.provider_name)
-                return None
-
-        except Exception:
-            logger.exception(
-                "Failed to retrieve credentials for %s", self.provider_name
+            self._save_token_info(new_token_data)
+            logger.info("Successfully refreshed token for %s", self.provider_name)
+            return new_token_data
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "Failed to refresh token for %s. Re-authentication will be required. Error: %s",
+                self.provider_name,
+                e,
             )
+            self.clear_credentials()
             return None
 
     def get_token_info(self) -> dict[str, Any] | None:
-        """Get detailed token information for debugging."""
+        """Retrieve token information from keyring."""
         try:
-            stored_data = keyring.get_password(
-                self.provider_name, f"{self.provider_name}_user"
-            )
-            if not stored_data:
-                return None
-
-            try:
-                token_info = json.loads(stored_data)
-                if "expires_at" in token_info:
-                    expiry_time = datetime.fromisoformat(
-                        token_info["expires_at"].replace("Z", "+00:00")
-                    )
-                    expires_in = int((expiry_time - datetime.now(UTC)).total_seconds())
-
-                    return {
-                        "expires_in": expires_in,
-                        "expiry_time": expiry_time,
-                        "time_remaining": expiry_time - datetime.now(UTC),
-                        "is_expired": datetime.now(UTC) >= expiry_time,
-                        "token_preview": token_info["access_token"][-10:]
-                        if token_info.get("access_token")
-                        else None,
-                        "scope": token_info.get("scope"),
-                    }
-            except (json.JSONDecodeError, KeyError):
-                return {"legacy_token": True, "token_preview": stored_data[-10:]}
-
-        except Exception:
-            logger.exception("Failed to get token info for %s", self.provider_name)
+            stored_token = keyring.get_password(self.provider_name, "token_info")
+            if stored_token:
+                return json.loads(stored_token)
             return None
+        except Exception:
+            logger.exception("Could not retrieve token for %s", self.provider_name)
+            return None
+
+    def clear_credentials(self) -> None:
+        """Clear stored token from keyring."""
+        try:
+            keyring.delete_password(self.provider_name, "token_info")
+            logger.info("Cleared stored token for %s.", self.provider_name)
+        except keyring.errors.PasswordDeleteError:
+            logger.debug("No stored token to clear for %s.", self.provider_name)
+        except Exception as e:
+            logger.exception(
+                "An unexpected error occurred while clearing token for %s: %s",
+                self.provider_name,
+                e,
+            )
 
 
 def get_auth_strategy(
@@ -373,117 +369,95 @@ def get_auth_strategy(
     model_alias: str | None = None,  # noqa: ARG001
 ) -> AuthStrategy:
     """
-    Get the appropriate authentication strategy for a provider.
-
+    Factory function to get the correct authentication strategy for a provider.
     Args:
         provider_name: The name of the provider.
-        model_alias: The alias of the model (not directly used here but good
-            for context).
-
+        model_alias: The model alias (currently unused but for future use).
     Returns:
-        An instance of the appropriate AuthStrategy subclass.
-
+        An instance of an AuthStrategy subclass.
     Raises:
-        ConfigurationError: If the provider is not found in configuration.
-        AuthenticationError: If the auth strategy is unknown.
+        ConfigurationError: If the provider is not found or misconfigured.
     """
-    from . import config  # Import here to avoid circular imports
+    from . import config  # Late import to avoid circular dependency
 
-    try:
-        config_data, _ = config.get_config()
-        providers = config_data.get("providers", {})
+    # Get the merged configuration
+    providers_config, _ = config.get_config()
+    provider_data = providers_config.get("providers", {}).get(provider_name)
 
-        if provider_name not in providers:
-            logger.error(
-                "Provider '%s' not found in configuration for auth", provider_name
-            )
+    if not provider_data:
+        raise ConfigurationError(f"Provider '{provider_name}' not found in configuration.")
+
+    strategy_name = provider_data.get("auth_strategy")
+    if not strategy_name:
+        return NoAuth(provider_name)
+
+    if strategy_name == "api_key":
+        return ApiKeyAuth(provider_name)
+
+    if strategy_name == "device_flow":
+        client_id = provider_data.get("client_id")
+        device_code_url = provider_data.get("device_code_url")
+        token_url = provider_data.get("token_url")
+        scope = provider_data.get("scope")
+
+        if not all([client_id, device_code_url, token_url, scope]):
             raise ConfigurationError(
-                f"Provider '{provider_name}' not found in configuration"
+                f"Provider '{provider_name}' is missing required device flow settings."
             )
 
-        provider_data = providers[provider_name]
-        auth_strategy_name = provider_data.get("auth_strategy")
-
-        # Default authentication strategies based on llm_type
-        if not auth_strategy_name:
-            llm_type = provider_data.get("llm_type", "")
-            if llm_type in ["openai_compatible", "google_genai"]:
-                auth_strategy_name = "api_key"
-            elif llm_type == "github_copilot":
-                auth_strategy_name = "device_flow"
-            elif llm_type == "ollama":
-                auth_strategy_name = "local"  # No authentication needed
-
-        # Instantiate the appropriate auth strategy
-        if auth_strategy_name == "api_key":
-            return ApiKeyAuth(provider_name)
-        if auth_strategy_name == "device_flow":
-            # Get auth details from provider configuration
-            auth_details = provider_data.get("auth_details", {})
-            required_fields = ["client_id", "device_code_url", "token_url", "scope"]
-            for field in required_fields:
-                if field not in auth_details:
-                    logger.error(
-                        "Missing required auth detail '%s' for provider '%s'",
-                        field,
-                        provider_name,
-                    )
-                    raise ConfigurationError(
-                        f"Missing auth detail '{field}' for provider '{provider_name}'"
-                    )
-            return DeviceFlowAuth(provider_name, **auth_details)
-        if auth_strategy_name == "local":
-            return NoAuth(provider_name)
-        logger.error(
-            "Unknown auth_strategy '%s' for provider '%s'",
-            auth_strategy_name,
-            provider_name,
-        )
-        raise AuthenticationError(
-            f"Unknown auth_strategy '{auth_strategy_name}' for provider "
-            f"'{provider_name}'"
+        return DeviceFlowAuth(
+            provider_name, client_id, device_code_url, token_url, scope
         )
 
-    except Exception:
-        logger.exception("Failed to get auth strategy for %s", provider_name)
-        raise
+    raise ConfigurationError(
+        f"Unknown auth strategy '{strategy_name}' for provider '{provider_name}'."
+    )
 
 
 def get_credentials(
     provider_name: str, model_alias: str, verbose: bool = False
 ) -> dict[str, Any] | None:
     """
-    Get stored credentials for a provider.
+    Get credentials for a given provider and model.
 
-    Args:
-        provider_name: The name of the provider.
-        model_alias: The alias of the model.
-        verbose: If True, print debug information.
-
-    Returns:
-        Dictionary of credentials or None if not found.
+    This function will first try to retrieve stored credentials. If they are
+    not available or invalid, it will trigger the authentication process.
     """
-    try:
-        auth_strategy = get_auth_strategy(provider_name, model_alias)
-        credentials = auth_strategy.get_credentials()
+    if verbose:
+        logger.setLevel("DEBUG")
 
-        if credentials and verbose and logger.isEnabledFor(10):  # DEBUG level
-            cred_keys = list(credentials.keys())
-            logger.debug("Credential keys for %s: %s", provider_name, cred_keys)
-    except Exception:
-        logger.exception("Failed to get credentials for %s", provider_name)
-        raise
-    else:
-        return credentials
+    try:
+        strategy = get_auth_strategy(provider_name, model_alias)
+        creds = strategy.get_credentials()
+        if creds:
+            logger.info("Successfully retrieved credentials for %s", provider_name)
+            return creds
+
+        logger.info(
+            "No valid credentials found for %s. Initiating authentication.",
+            provider_name,
+        )
+        return strategy.authenticate()
+
+    except (ConfigurationError, AuthenticationError) as e:
+        logger.error("Authentication failed for %s: %s", provider_name, e)
+        return None
+    except Exception as e:
+        logger.exception("An unexpected error occurred during authentication for %s", provider_name)
+        return None
 
 
 class NoAuth(AuthStrategy):
-    """No authentication strategy for local providers."""
+    """Dummy authentication for providers that don't need it."""
 
     def authenticate(self) -> dict[str, Any] | None:
         """No authentication needed."""
         return {}
 
     def get_credentials(self) -> dict[str, Any] | None:
-        """No credentials needed."""
+        """No credentials to retrieve."""
         return {}
+
+    def clear_credentials(self) -> None:
+        """No credentials to clear."""
+        pass
