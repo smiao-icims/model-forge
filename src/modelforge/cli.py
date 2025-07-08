@@ -48,7 +48,7 @@ def cli() -> None:
     """ModelForge CLI for managing LLM configurations."""
 
 
-@cli.group(name="config")
+@cli.group()
 def config_group() -> None:
     """Configuration management commands."""
 
