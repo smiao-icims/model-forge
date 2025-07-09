@@ -1,6 +1,5 @@
 """Tests for the authentication module."""
 
-import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 
@@ -11,9 +10,15 @@ from modelforge.auth import ApiKeyAuth, DeviceFlowAuth
 
 
 @pytest.fixture
-def mock_keyring(mocker: MockerFixture) -> Mock:
-    """Mocks the keyring module."""
-    return mocker.patch("modelforge.auth.keyring", autospec=True)
+def mock_config(mocker: MockerFixture) -> Mock:
+    """Mocks the config module functions."""
+    mock_get_config = mocker.patch("modelforge.auth.get_config")
+    mock_save_config = mocker.patch("modelforge.auth.save_config")
+
+    # Setup default config structure
+    mock_get_config.return_value = ({"providers": {}}, None)
+
+    return Mock(get_config=mock_get_config, save_config=mock_save_config)
 
 
 @pytest.fixture
@@ -28,35 +33,37 @@ def mock_requests(mocker: MockerFixture) -> Mock:
     return mocker.patch("modelforge.auth.requests", autospec=True)
 
 
-def test_api_key_auth_authenticate(mock_keyring: Mock, mock_getpass: Mock) -> None:
+def test_api_key_auth_authenticate(mock_config: Mock, mock_getpass: Mock) -> None:
     """Test that ApiKeyAuth prompts for a key and saves it."""
     auth_strategy = ApiKeyAuth("test_provider")
 
     credentials = auth_strategy.authenticate()
 
     mock_getpass.assert_called_once_with("Enter API key for test_provider: ")
-    mock_keyring.set_password.assert_called_once_with(
-        "test_provider", "test_provider_user", "test-api-key"
-    )
+    mock_config.save_config.assert_called_once()
     assert credentials == {"api_key": "test-api-key"}
 
 
-def test_api_key_auth_get_credentials_found(mock_keyring: Mock) -> None:
+def test_api_key_auth_get_credentials_found(mock_config: Mock) -> None:
     """Test retrieving a stored API key."""
-    mock_keyring.get_password.return_value = "stored-api-key"
+    # Setup config with stored credentials
+    mock_config.get_config.return_value = (
+        {"providers": {"test_provider": {"auth_data": {"api_key": "stored-api-key"}}}},
+        None,
+    )
+
     auth_strategy = ApiKeyAuth("test_provider")
 
     credentials = auth_strategy.get_credentials()
 
-    mock_keyring.get_password.assert_called_once_with(
-        "test_provider", "test_provider_user"
-    )
     assert credentials == {"api_key": "stored-api-key"}
 
 
-def test_api_key_auth_get_credentials_not_found(mock_keyring: Mock) -> None:
+def test_api_key_auth_get_credentials_not_found(mock_config: Mock) -> None:
     """Test retrieving a non-existent API key."""
-    mock_keyring.get_password.return_value = None
+    # Setup config without stored credentials
+    mock_config.get_config.return_value = ({"providers": {}}, None)
+
     auth_strategy = ApiKeyAuth("test_provider")
 
     credentials = auth_strategy.get_credentials()
@@ -64,7 +71,7 @@ def test_api_key_auth_get_credentials_not_found(mock_keyring: Mock) -> None:
     assert credentials is None
 
 
-def test_device_flow_auth_success(mock_keyring: Mock, mock_requests: Mock) -> None:
+def test_device_flow_auth_success(mock_config: Mock, mock_requests: Mock) -> None:
     """Test the successful device flow authentication."""
     # Arrange
     mock_post = mock_requests.post
@@ -107,14 +114,14 @@ def test_device_flow_auth_success(mock_keyring: Mock, mock_requests: Mock) -> No
 
     # Assert
     assert mock_requests.post.call_count == 3
-    mock_keyring.set_password.assert_called_once()
+    mock_config.save_config.assert_called()
     assert credentials is not None
     assert credentials["access_token"] == "test-access-token"
     assert "expires_at" in credentials
     assert "expires_in" in credentials
 
 
-def test_device_flow_get_credentials_valid_token(mock_keyring: Mock) -> None:
+def test_device_flow_get_credentials_valid_token(mock_config: Mock) -> None:
     """Test retrieving a valid, non-expired device flow token."""
     # Arrange
     now = datetime.now(UTC)
@@ -122,7 +129,11 @@ def test_device_flow_get_credentials_valid_token(mock_keyring: Mock) -> None:
         "access_token": "valid-token",
         "expires_at": (now + timedelta(hours=1)).isoformat(),
     }
-    mock_keyring.get_password.return_value = json.dumps(token_info)
+
+    mock_config.get_config.return_value = (
+        {"providers": {"test_provider": {"auth_data": token_info}}},
+        None,
+    )
 
     auth_strategy = DeviceFlowAuth(
         "test_provider",
@@ -141,7 +152,7 @@ def test_device_flow_get_credentials_valid_token(mock_keyring: Mock) -> None:
     assert "expires_at" in credentials
 
 
-def test_device_flow_get_credentials_expired_token(mock_keyring: Mock) -> None:
+def test_device_flow_get_credentials_expired_token(mock_config: Mock) -> None:
     """Test that an expired token is not returned."""
     # Arrange
     yesterday = datetime.now(UTC) - timedelta(days=1)
@@ -149,7 +160,11 @@ def test_device_flow_get_credentials_expired_token(mock_keyring: Mock) -> None:
         "access_token": "expired-token",
         "expires_at": yesterday.isoformat(),
     }
-    mock_keyring.get_password.return_value = json.dumps(token_info)
+
+    mock_config.get_config.return_value = (
+        {"providers": {"test_provider": {"auth_data": token_info}}},
+        None,
+    )
 
     auth_strategy = DeviceFlowAuth(
         "test_provider",

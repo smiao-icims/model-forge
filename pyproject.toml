@@ -22,7 +22,6 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.11"
 click = "^8.1.7"
-keyring = "^25.2.1"
 requests = "^2.32.3"
 langchain-core = "^0.3.0"
 langchain-openai = "^0.3.0"

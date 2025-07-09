@@ -229,7 +229,7 @@ def get_credentials(provider_name: str, model_alias: str, verbose: bool = False)
 
 **MUST CHECK:**
 - [ ] No hardcoded secrets or API keys
-- [ ] Sensitive data uses secure storage (keyring)
+- [ ] Sensitive data uses secure storage (configuration files)
 - [ ] Input validation for user-provided data
 - [ ] No logging of sensitive information
 - [ ] Proper handling of authentication tokens
@@ -238,7 +238,7 @@ def get_credentials(provider_name: str, model_alias: str, verbose: bool = False)
 ```python
 # ✅ GOOD
 def store_api_key(self, api_key: str) -> None:
-    """Store API key securely using system keyring."""
+    """Store API key securely in configuration file."""
     if not api_key or not api_key.strip():
         raise ValueError("API key cannot be empty")
 
@@ -246,14 +246,14 @@ def store_api_key(self, api_key: str) -> None:
     if not api_key.startswith(('sk-', 'sk-proj-')):
         raise ValueError("Invalid API key format")
 
-    keyring.set_password(self.provider_name, self.username, api_key)
+    self._save_auth_data({"api_key": api_key})
     logger.info("API key stored successfully for provider: %s", self.provider_name)
 
 # ❌ BAD
 def store_api_key(self, api_key: str) -> None:
     """Store API key."""
     logger.info("Storing API key: %s", api_key)  # SECURITY ISSUE!
-    keyring.set_password(self.provider_name, self.username, api_key)
+    self._save_auth_data({"api_key": api_key})
 ```
 
 ### 8. **Testing Considerations**
@@ -271,21 +271,20 @@ def store_api_key(self, api_key: str) -> None:
 ```python
 # ✅ GOOD - Testable design
 class ApiKeyAuth(AuthStrategy):
-    def __init__(self, provider_name: str, keyring_service: Optional[str] = None):
+    def __init__(self, provider_name: str):
         self.provider_name = provider_name
-        self.keyring_service = keyring_service or provider_name
-        self.username = f"{provider_name}_user"
 
-    def _get_keyring_password(self, service: str, username: str) -> Optional[str]:
-        """Wrapper for keyring.get_password to enable testing."""
-        return keyring.get_password(service, username)
+    def _get_auth_data(self) -> Dict[str, Any]:
+        """Wrapper for config access to enable testing."""
+        return get_config()[0].get("providers", {}).get(self.provider_name, {}).get("auth_data", {})
 
 # ❌ BAD - Hard to test
 class ApiKeyAuth(AuthStrategy):
     def get_credentials(self) -> Optional[Dict[str, Any]]:
-        # Direct keyring call - hard to mock in tests
-        api_key = keyring.get_password(self.provider_name, self.username)
-        return {"api_key": api_key} if api_key else None
+        # Direct config call - hard to mock in tests
+        config_data, _ = get_config()
+        auth_data = config_data.get("providers", {}).get(self.provider_name, {}).get("auth_data", {})
+        return auth_data if auth_data else None
 ```
 
 ### **Test Execution Requirements**
@@ -335,7 +334,7 @@ poetry run ruff format .
 
 **🚧 REMAINING (104 errors):**
 - Line length violations (E501): ~25 errors
-- Exception handling (TRY003, TRY301, TRY401): ~40 errors  
+- Exception handling (TRY003, TRY301, TRY401): ~40 errors
 - Path operations (PTH123): 2 errors
 - Security issues (S110, S311, S113): 4 errors
 - Code complexity (PLR0912, PLR0913, PLR0915): 4 errors
@@ -423,7 +422,7 @@ try:
 except Exception:
     pass
 
-# ✅ Fixed: Log the exception  
+# ✅ Fixed: Log the exception
 try:
     risky_operation()
 except Exception:
@@ -445,7 +444,7 @@ response = requests.post(url, data=data, timeout=30)
 #### **🏗️ Code Complexity (PLR0912, PLR0913, PLR0915)**
 **What to Fix:**
 - PLR0912: Too many branches (>12)
-- PLR0913: Too many arguments (>5)  
+- PLR0913: Too many arguments (>5)
 - PLR0915: Too many statements (>50)
 
 **How to Fix:**
@@ -484,7 +483,7 @@ git add .
 git commit -m "fix: Clear all remaining linter errors
 
 ✅ Fixed line length violations (E501)
-✅ Improved exception handling patterns  
+✅ Improved exception handling patterns
 ✅ Updated path operations to use pathlib
 ✅ Added security improvements
 ✅ Reduced code complexity

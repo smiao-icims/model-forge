@@ -9,7 +9,7 @@ This library is intended to be used by various Python-based AI projects to provi
 The library is composed of three core modules:
 
 -   **`config`**: Manages configuration files with a two-tier system - global (`~/.config/model-forge/config.json`) and local (`./.model-forge/config.json`) - where all provider and model settings are stored.
--   **`auth`**: Provides a suite of authentication strategies (API Key, OAuth 2.0 Device Flow, and a No-Op for local models) and handles secure credential storage using the system's native keyring.
+-   **`auth`**: Provides a suite of authentication strategies (API Key, OAuth 2.0 Device Flow, and a No-Op for local models) and handles secure credential storage in configuration files.
 -   **`registry`**: Acts as the main entry point and factory. It reads the configuration, invokes the appropriate authentication strategy, and instantiates ready-to-use, LangChain-compatible LLM objects.
 
 ## 🛠️ **Quick Start**
@@ -259,6 +259,6 @@ To use this library in a host application (e.g., RAG-Forge):
 
 - **Multi-Provider Support**: OpenAI, Ollama, GitHub Copilot, Google Gemini
 - **Flexible Authentication**: API Key, OAuth 2.0 Device Flow, Local (no auth)
-- **Secure Credential Storage**: Uses system keyring for API keys and tokens
+- **Secure Credential Storage**: Stores API keys and tokens in configuration files
 - **LangChain Integration**: Provides ready-to-use LangChain-compatible model instances
 - **Centralized Configuration**: Single configuration file managing all providers and models
