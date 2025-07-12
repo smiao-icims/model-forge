@@ -134,6 +134,11 @@ def add_model(
                     "base_url": "https://api.openai.com/v1",
                     "auth_strategy": "api_key",
                 },
+                "openrouter": {
+                    "llm_type": "openai-compatible",
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "auth_strategy": "api_key",
+                },
                 "google": {
                     "llm_type": "google_genai",
                     "auth_strategy": "api_key",
