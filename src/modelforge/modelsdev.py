@@ -60,7 +60,12 @@ class ModelsDevClient:
         """Load data from cache."""
         try:
             with cache_path.open() as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                if isinstance(data, list):
+                    return {"data": data}
+                return {"data": data}
         except OSError:
             logger.warning("Failed to read cache file: %s", cache_path)
             return None
@@ -91,8 +96,8 @@ class ModelsDevClient:
             cache_path, self.CACHE_TTL["providers"]
         ):
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
-                return cached_data
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
+                return cached_data["data"]
 
         try:
             response = self.session.get(f"{self.BASE_URL}/providers")
@@ -100,29 +105,31 @@ class ModelsDevClient:
             providers = response.json()
             if isinstance(providers, dict):
                 providers = [providers]
+            if not isinstance(providers, list):
+                providers = [providers]
         except requests.exceptions.ConnectionError:
             logger.exception("Connection error while fetching providers")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 logger.info("Using stale cached providers data")
-                return cached_data
+                return cached_data["data"]
             raise
         except requests.exceptions.HTTPError:
             logger.exception("HTTP error while fetching providers")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 logger.info("Using stale cached providers data")
-                return cached_data
+                return cached_data["data"]
             raise
         except requests.exceptions.Timeout:
             logger.exception("Timeout while fetching providers")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 logger.info("Using stale cached providers data")
-                return cached_data
+                return cached_data["data"]
             raise
         else:
-            self._save_to_cache(cache_path, providers)
+            self._save_to_cache(cache_path, {"data": providers})
             return providers
 
     def get_models(
@@ -143,8 +150,8 @@ class ModelsDevClient:
             cache_path, self.CACHE_TTL["models"]
         ):
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
-                return cached_data
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
+                return cached_data["data"]
 
         try:
             url = f"{self.BASE_URL}/models"
@@ -155,29 +162,31 @@ class ModelsDevClient:
             response = self.session.get(url, params=params)
             response.raise_for_status()
             models = response.json()
+            if not isinstance(models, list):
+                models = [models]
         except requests.exceptions.ConnectionError:
             logger.exception("Connection error while fetching models")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 logger.info("Using stale cached models data")
-                return cached_data
+                return cached_data["data"]
             raise
         except requests.exceptions.HTTPError:
             logger.exception("HTTP error while fetching models")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 logger.info("Using stale cached models data")
-                return cached_data
+                return cached_data["data"]
             raise
         except requests.exceptions.Timeout:
             logger.exception("Timeout while fetching models")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 logger.info("Using stale cached models data")
-                return cached_data
+                return cached_data["data"]
             raise
         else:
-            self._save_to_cache(cache_path, models)
+            self._save_to_cache(cache_path, {"data": models})
             return models
 
     def get_model_info(
@@ -199,7 +208,7 @@ class ModelsDevClient:
             cache_path, self.CACHE_TTL["model_info"]
         ):
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 return cached_data
 
         try:
@@ -207,24 +216,26 @@ class ModelsDevClient:
             response = self.session.get(url)
             response.raise_for_status()
             model_info = response.json()
+            if not isinstance(model_info, dict):
+                model_info = {"model": model_info}
         except requests.exceptions.ConnectionError:
             logger.exception("Connection error while fetching model info")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached model info")
                 return cached_data
             raise
         except requests.exceptions.HTTPError:
             logger.exception("HTTP error while fetching model info")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached model info")
                 return cached_data
             raise
         except requests.exceptions.Timeout:
             logger.exception("Timeout while fetching model info")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached model info")
                 return cached_data
             raise
@@ -250,7 +261,7 @@ class ModelsDevClient:
             cache_path, self.CACHE_TTL["provider_config"]
         ):
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 return cached_data
 
         try:
@@ -258,24 +269,26 @@ class ModelsDevClient:
             response = self.session.get(url)
             response.raise_for_status()
             provider_config = response.json()
+            if not isinstance(provider_config, dict):
+                provider_config = {"config": provider_config}
         except requests.exceptions.ConnectionError:
             logger.exception("Connection error while fetching provider config")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached provider config")
                 return cached_data
             raise
         except requests.exceptions.HTTPError:
             logger.exception("HTTP error while fetching provider config")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached provider config")
                 return cached_data
             raise
         except requests.exceptions.Timeout:
             logger.exception("Timeout while fetching provider config")
             cached_data = self._load_from_cache(cache_path)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached provider config")
                 return cached_data
             raise

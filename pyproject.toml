@@ -190,4 +190,3 @@ exclude_lines = [
 
 [tool.poetry.group.dev.dependencies]
 requests-mock = "^1.12.1"
-

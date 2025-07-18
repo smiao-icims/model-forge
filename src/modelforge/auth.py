@@ -299,7 +299,7 @@ class DeviceFlowAuth(AuthStrategy):
                     "Successfully obtained access token for %s", self.provider_name
                 )
                 self._save_token_info(token_data)
-                return token_data
+                return dict(token_data)
 
     def _save_token_info(self, token_data: dict[str, Any]) -> None:
         """Save token information to config file."""
@@ -378,7 +378,7 @@ class DeviceFlowAuth(AuthStrategy):
 
             self._save_token_info(new_token_data)
             logger.info("Successfully refreshed token for %s", self.provider_name)
-            return new_token_data
+            return dict(new_token_data)
 
     def get_token_info(self) -> dict[str, Any] | None:
         """Retrieve token information from config file."""
