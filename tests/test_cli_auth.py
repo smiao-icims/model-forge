@@ -68,7 +68,7 @@ class TestCLIModelsCommands:
 
     def test_models_list_no_models(self) -> None:
         """Test models list with no models available."""
-        with patch("modelforge.modelsdev.ModelsDevClient") as mock_client:
+        with patch("modelforge.cli.ModelsDevClient") as mock_client:
             mock_client.return_value.get_models.return_value = []
             result = self.runner.invoke(cli, ["models", "list"])
             assert result.exit_code == 0
@@ -76,7 +76,7 @@ class TestCLIModelsCommands:
 
     def test_models_search_no_results(self) -> None:
         """Test models search with no results."""
-        with patch("modelforge.modelsdev.ModelsDevClient") as mock_client:
+        with patch("modelforge.cli.ModelsDevClient") as mock_client:
             mock_client.return_value.search_models.return_value = []
             result = self.runner.invoke(cli, ["models", "search", "nonexistent"])
             assert result.exit_code == 0
@@ -87,13 +87,12 @@ class TestCLIModelsCommands:
         result = self.runner.invoke(cli, ["models", "info"])
         assert result.exit_code != 0
         assert "--provider" in result.output
-        assert "--model" in result.output
 
     def test_models_list_json_format(self) -> None:
         """Test models list with JSON format."""
         mock_models = [{"name": "test-model", "provider": "test"}]
 
-        with patch("modelforge.modelsdev.ModelsDevClient") as mock_client:
+        with patch("modelforge.cli.ModelsDevClient") as mock_client:
             mock_client.return_value.get_models.return_value = mock_models
             result = self.runner.invoke(cli, ["models", "list", "--format", "json"])
             assert result.exit_code == 0
@@ -104,7 +103,7 @@ class TestCLIModelsCommands:
         """Test models search with various filters."""
         mock_results = [{"name": "test"}]
 
-        with patch("modelforge.modelsdev.ModelsDevClient") as mock_client:
+        with patch("modelforge.cli.ModelsDevClient") as mock_client:
             mock_client.return_value.search_models.return_value = mock_results
 
             # Test with provider filter

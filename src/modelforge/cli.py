@@ -6,7 +6,6 @@ from typing import Any
 
 # Third-party imports
 import click
-from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -388,9 +387,9 @@ def auth_login(provider: str, api_key: str | None, force: bool) -> None:
 
 
 @auth_group.command(name="logout")
-@click.option("--provider", required=True, help="The provider to log out from")
+@click.option("--provider", required=False, help="The provider to log out from")
 @click.option("--all-providers", is_flag=True, help="Log out from all providers")
-def auth_logout(provider: str, all_providers: bool) -> None:
+def auth_logout(provider: str | None, all_providers: bool) -> None:
     """Clear stored credentials for a provider."""
     try:
         if all_providers:
@@ -480,7 +479,7 @@ def list_models(provider: str | None, refresh: bool, output_format: str) -> None
             click.echo(f"\n📋 Found {len(models)} models:\n")
 
             # Group by provider
-            provider_models = {}
+            provider_models: dict[str, list[dict[str, Any]]] = {}
             for model in models:
                 prov = model.get("provider", "unknown")
                 if prov not in provider_models:
@@ -636,7 +635,7 @@ def _check_provider_status(
 
 
 def _invoke_with_smart_retry(
-    chain: BaseChatModel,
+    chain: Any,
     input_data: dict[str, Any],
     verbose: bool = False,
     max_retries: int = 3,
@@ -671,7 +670,12 @@ def _invoke_with_smart_retry(
                         f"for GitHub Copilot..."
                     )
 
-            return chain.invoke(input_data)
+            from langchain_core.messages import BaseMessage
+
+            result = chain.invoke(input_data)
+            if isinstance(result, BaseMessage):
+                return str(result.content)
+            return str(result)
 
         except Exception as e:
             last_exception = e
