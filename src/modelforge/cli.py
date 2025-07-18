@@ -6,6 +6,7 @@ from typing import Any
 
 # Third-party imports
 import click
+from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -635,7 +636,7 @@ def _check_provider_status(
 
 
 def _invoke_with_smart_retry(
-    chain: Any,
+    chain: object,
     input_data: dict[str, Any],
     verbose: bool = False,
     max_retries: int = 3,
@@ -669,8 +670,6 @@ def _invoke_with_smart_retry(
                         f"🔄 Retry attempt {attempt + 1}/{max_retries} "
                         f"for GitHub Copilot..."
                     )
-
-            from langchain_core.messages import BaseMessage
 
             result = chain.invoke(input_data)
             if isinstance(result, BaseMessage):
