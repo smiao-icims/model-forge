@@ -88,6 +88,12 @@ class ApiKeyAuth(AuthStrategy):
         logger.warning("No API key provided for %s", self.provider_name)
         return None
 
+    def store_api_key(self, api_key: str) -> None:
+        """Store API key for the provider without prompting."""
+        auth_data = {"api_key": api_key}
+        self._save_auth_data(auth_data)
+        logger.info("API key stored for %s", self.provider_name)
+
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored API key from config."""
         try:
@@ -162,6 +168,15 @@ class DeviceFlowAuth(AuthStrategy):
         )
         print(f"And enter this code: {device_code_data['user_code']}")
         print("Waiting for authentication...")
+
+        # Try to open browser automatically
+        try:
+            import webbrowser
+
+            webbrowser.open(device_code_data["verification_uri"])
+            print("Browser opened automatically. If not, use the URL above.")
+        except Exception:
+            print("Please open the URL manually in your browser.")
 
         # Step 3: Poll for token
         return self._poll_for_token(device_code_data)

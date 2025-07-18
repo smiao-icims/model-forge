@@ -328,10 +328,106 @@ def test_model(prompt: str, verbose: bool) -> None:
         click.echo(f"\nAn error occurred while running the model: {e}", err=True)
 
 
-@cli.command(name="status")
+@cli.group(name="auth")
+def auth_group() -> None:
+    """Authentication management commands."""
+
+
+@auth_group.command(name="login")
+@click.option("--provider", required=True, help="The provider to authenticate with")
+@click.option("--api-key", help="API key for authentication (skips interactive prompt)")
+@click.option(
+    "--force", is_flag=True, help="Force re-authentication even if credentials exist"
+)
+def auth_login(provider: str, api_key: str | None, force: bool) -> None:
+    """Authenticate with a provider using API key or device flow."""
+    try:
+        current_config, _ = config.get_config()
+        providers = current_config.get("providers", {})
+
+        if provider not in providers:
+            click.echo(f"❌ Provider '{provider}' not found in configuration")
+            click.echo("Use 'modelforge models list --provider models.dev'")
+            click.echo("to discover providers")
+            return
+
+        provider_data = providers[provider]
+        auth_strategy = auth.get_auth_strategy(provider, provider_data)
+
+        # Check for existing credentials
+        if not force and auth_strategy.get_credentials():
+            click.echo(f"✅ Already authenticated with '{provider}'")
+            click.echo("Use --force to re-authenticate")
+            return
+
+        # Handle different auth strategies
+        if isinstance(auth_strategy, auth.ApiKeyAuth):
+            if api_key:
+                auth_strategy.store_api_key(api_key)
+                click.echo(f"✅ API key stored for provider '{provider}'")
+            else:
+                credentials = auth_strategy.authenticate()
+                if credentials:
+                    click.echo(f"✅ Successfully authenticated with '{provider}'")
+                else:
+                    click.echo(f"❌ Authentication failed for '{provider}'")
+        elif isinstance(auth_strategy, auth.DeviceFlowAuth):
+            click.echo(f"🔐 Starting device flow authentication for '{provider}'...")
+            credentials = auth_strategy.authenticate()
+            if credentials:
+                click.echo(f"✅ Successfully authenticated with '{provider}'")
+            else:
+                click.echo(f"❌ Authentication failed for '{provider}'")
+        else:
+            click.echo(f"✅ Provider '{provider}' doesn't require authentication")
+
+    except Exception as e:
+        logger.exception("Authentication failed")
+        click.echo(f"❌ Authentication failed: {e}", err=True)
+
+
+@auth_group.command(name="logout")
+@click.option("--provider", required=True, help="The provider to log out from")
+@click.option("--all-providers", is_flag=True, help="Log out from all providers")
+def auth_logout(provider: str, all_providers: bool) -> None:
+    """Clear stored credentials for a provider."""
+    try:
+        if all_providers:
+            current_config, _ = config.get_config()
+            providers = current_config.get("providers", {})
+
+            for provider_name in providers:
+                try:
+                    provider_data = providers[provider_name]
+                    auth_strategy = auth.get_auth_strategy(provider_name, provider_data)
+                    auth_strategy.clear_credentials()
+                    click.echo(f"✅ Cleared credentials for '{provider_name}'")
+                except Exception as e:
+                    click.echo(
+                        f"⚠️  Failed to clear credentials for '{provider_name}': {e}"
+                    )
+        else:
+            current_config, _ = config.get_config()
+            providers = current_config.get("providers", {})
+
+            if provider not in providers:
+                click.echo(f"❌ Provider '{provider}' not found")
+                return
+
+            provider_data = providers[provider]
+            auth_strategy = auth.get_auth_strategy(provider, provider_data)
+            auth_strategy.clear_credentials()
+            click.echo(f"✅ Cleared credentials for '{provider}'")
+
+    except Exception as e:
+        logger.exception("Logout failed")
+        click.echo(f"❌ Logout failed: {e}", err=True)
+
+
+@auth_group.command(name="status")
 @click.option("--provider", help="Check status for specific provider")
 @click.option("--verbose", is_flag=True, help="Show detailed token information")
-def status(provider: str | None, verbose: bool) -> None:
+def auth_status(provider: str | None, verbose: bool) -> None:
     """Check authentication status for providers."""
     try:
         current_config, _ = config.get_config()
@@ -353,6 +449,146 @@ def status(provider: str | None, verbose: bool) -> None:
     except Exception as e:
         logger.exception("Failed to check authentication status")
         click.echo(f"❌ Error checking status: {e}", err=True)
+
+
+@cli.group()
+def models() -> None:
+    """Model discovery and management commands."""
+
+
+@models.command(name="list")
+@click.option("--provider", help="Filter by specific provider")
+@click.option("--refresh", is_flag=True, help="Force refresh from models.dev")
+@click.option(
+    "--format", "output_format", type=click.Choice(["table", "json"]), default="table"
+)
+def list_models(provider: str | None, refresh: bool, output_format: str) -> None:
+    """List available models from models.dev."""
+    try:
+        from .modelsdev import ModelsDevClient
+
+        client = ModelsDevClient()
+        models = client.get_models(provider=provider, force_refresh=refresh)
+
+        if not models:
+            click.echo("No models found")
+            return
+
+        if output_format == "json":
+            click.echo(json.dumps(models, indent=2))
+        else:
+            # Table format
+            click.echo(f"\n📋 Found {len(models)} models:\n")
+
+            # Group by provider
+            provider_models = {}
+            for model in models:
+                prov = model.get("provider", "unknown")
+                if prov not in provider_models:
+                    provider_models[prov] = []
+                provider_models[prov].append(model)
+
+            for prov, prov_models in provider_models.items():
+                click.echo(f"🤖 {prov.upper()}:")
+                for model in prov_models:
+                    name = model.get("name", "unknown")
+                    display_name = model.get("display_name", name)
+                    description = model.get("description", "")
+                    if len(description) > 50:
+                        description = description[:47] + "..."
+
+                    click.echo(f"  • {display_name} - {description}")
+                click.echo()
+
+    except Exception as e:
+        logger.exception("Failed to list models")
+        click.echo(f"❌ Error listing models: {e}", err=True)
+
+
+@models.command(name="search")
+@click.argument("query")
+@click.option("--provider", help="Filter by specific provider")
+@click.option("--capability", multiple=True, help="Filter by capabilities")
+@click.option("--max-price", type=float, help="Maximum price per 1K tokens")
+@click.option("--refresh", is_flag=True, help="Force refresh from models.dev")
+def search_models(
+    query: str,
+    provider: str | None,
+    capability: tuple[str, ...],
+    max_price: float | None,
+    refresh: bool,
+) -> None:
+    """Search models by name, description, or capabilities."""
+    try:
+        from .modelsdev import ModelsDevClient
+
+        client = ModelsDevClient()
+        models = client.search_models(
+            query=query,
+            provider=provider,
+            capabilities=list(capability) if capability else None,
+            max_price=max_price,
+            force_refresh=refresh,
+        )
+
+        if not models:
+            click.echo("No models found matching criteria")
+            return
+
+        click.echo(f"\n🔍 Found {len(models)} matching models:\n")
+        for model in models:
+            name = model.get("name", "unknown")
+            display_name = model.get("display_name", name)
+            provider_name = model.get("provider", "unknown")
+            description = model.get("description", "")
+
+            click.echo(f"🤖 {display_name} ({provider_name})")
+            click.echo(f"   {description}")
+
+            if model.get("capabilities"):
+                caps = ", ".join(model["capabilities"])
+                click.echo(f"   Capabilities: {caps}")
+
+            if model.get("pricing"):
+                pricing = model["pricing"]
+                if "input_per_1k_tokens" in pricing:
+                    click.echo(f"   Price: ${pricing['input_per_1k_tokens']}/1K tokens")
+
+            click.echo()
+
+    except Exception as e:
+        logger.exception("Failed to search models")
+        click.echo(f"❌ Error searching models: {e}", err=True)
+
+
+@models.command(name="info")
+@click.option("--provider", required=True, help="The provider name")
+@click.option("--model", required=True, help="The model name")
+@click.option("--refresh", is_flag=True, help="Force refresh from models.dev")
+def model_info(provider: str, model: str, refresh: bool) -> None:
+    """Get detailed information about a specific model."""
+    try:
+        from .modelsdev import ModelsDevClient
+
+        client = ModelsDevClient()
+        info = client.get_model_info(
+            provider=provider, model=model, force_refresh=refresh
+        )
+
+        click.echo(json.dumps(info, indent=2))
+
+    except Exception as e:
+        logger.exception("Failed to get model info")
+        click.echo(f"❌ Error getting model info: {e}", err=True)
+
+
+@cli.command(name="status")
+@click.option("--provider", help="Check status for specific provider")
+@click.option("--verbose", is_flag=True, help="Show detailed token information")
+def status(provider: str | None, verbose: bool) -> None:
+    """Check authentication status for providers (deprecated, use 'auth status')."""
+    click.echo("⚠️  This command is deprecated. Use 'modelforge auth status' instead.")
+    auth_status(provider, verbose)
 
 
 def _check_provider_status(

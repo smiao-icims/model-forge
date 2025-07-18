@@ -44,6 +44,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "types-requests>=2.32.0",
     "twine>=6.1.0",
+    "requests-mock>=1.12.1",
 ]
 
 [project.scripts]
@@ -81,6 +82,7 @@ ignore = [
     "PLR2004", # Magic value comparison (acceptable for tests)
     "PLR0913", # Too many arguments in function definition (acceptable for CLI)
     "TRY003",  # Avoid specifying long messages outside exception class
+    "ANN101",  # Missing type annotation for self in method (acceptable)
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -185,3 +187,7 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.poetry.group.dev.dependencies]
+requests-mock = "^1.12.1"
+

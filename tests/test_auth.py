@@ -33,6 +33,12 @@ def mock_requests(mocker: MockerFixture) -> Mock:
     return mocker.patch("modelforge.auth.requests", autospec=True)
 
 
+@pytest.fixture
+def mock_webbrowser(mocker: MockerFixture) -> Mock:
+    """Mocks the webbrowser module."""
+    return mocker.patch("webbrowser.open", autospec=True)
+
+
 def test_api_key_auth_authenticate(mock_config: Mock, mock_getpass: Mock) -> None:
     """Test that ApiKeyAuth prompts for a key and saves it."""
     auth_strategy = ApiKeyAuth("test_provider")
@@ -71,7 +77,7 @@ def test_api_key_auth_get_credentials_not_found(mock_config: Mock) -> None:
     assert credentials is None
 
 
-def test_device_flow_auth_success(mock_config: Mock, mock_requests: Mock) -> None:
+def test_device_flow_auth_success(mock_config: Mock, mock_requests: Mock, mock_webbrowser: Mock) -> None:
     """Test the successful device flow authentication."""
     # Arrange
     mock_post = mock_requests.post
