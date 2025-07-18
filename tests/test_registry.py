@@ -98,7 +98,7 @@ def test_get_llm_openai_compatible_success(mocker: MockerFixture) -> None:
         verbose=False,
     )
     mock_chat_openai.assert_called_once_with(
-        model_name="gpt-4o-mini",
+        model="gpt-4o-mini",
         api_key="test-api-key-123",
         base_url="https://api.openai.com/v1",
     )

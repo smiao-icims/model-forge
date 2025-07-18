@@ -17,7 +17,7 @@ COPILOT_PROVIDER = "github_copilot"
 def run_cli_command(args: list[str]) -> bool:
     """Run a CLI command and print output."""
     if not args or not isinstance(args, list):
-        raise ValueError("Invalid arguments provided")
+        raise ValueError("Invalid args")
 
     # Sanitize each argument
     safe_args = [shlex.quote(str(arg)) for arg in args]
