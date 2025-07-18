@@ -97,16 +97,22 @@ class ModelsDevClient:
         ):
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                return cached_data["data"]
+                data = cached_data["data"]
+                if isinstance(data, list):
+                    return data
+                return [data]
 
         try:
             response = self.session.get(f"{self.BASE_URL}/providers")
             response.raise_for_status()
-            providers = response.json()
-            if isinstance(providers, dict):
-                providers = [providers]
-            if not isinstance(providers, list):
-                providers = [providers]
+            providers_data = response.json()
+            providers: list[dict[str, Any]] = (
+                [providers_data]
+                if isinstance(providers_data, dict)
+                else providers_data
+                if isinstance(providers_data, list)
+                else [providers_data]
+            )
         except requests.exceptions.ConnectionError:
             logger.exception("Connection error while fetching providers")
             cached_data = self._load_from_cache(cache_path)
@@ -151,7 +157,10 @@ class ModelsDevClient:
         ):
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                return cached_data["data"]
+                data = cached_data["data"]
+                if isinstance(data, list):
+                    return data
+                return [data]
 
         try:
             url = f"{self.BASE_URL}/models"
@@ -161,9 +170,10 @@ class ModelsDevClient:
 
             response = self.session.get(url, params=params)
             response.raise_for_status()
-            models = response.json()
-            if not isinstance(models, list):
-                models = [models]
+            models_data = response.json()
+            models: list[dict[str, Any]] = (
+                models_data if isinstance(models_data, list) else [models_data]
+            )
         except requests.exceptions.ConnectionError:
             logger.exception("Connection error while fetching models")
             cached_data = self._load_from_cache(cache_path)
@@ -271,6 +281,7 @@ class ModelsDevClient:
             provider_config = response.json()
             if not isinstance(provider_config, dict):
                 provider_config = {"config": provider_config}
+            return provider_config
         except requests.exceptions.ConnectionError:
             logger.exception("Connection error while fetching provider config")
             cached_data = self._load_from_cache(cache_path)

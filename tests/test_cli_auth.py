@@ -30,7 +30,7 @@ class TestCLIAuthCommands:
         """Test auth logout without provider argument."""
         result = self.runner.invoke(cli, ["auth", "logout"])
         assert result.exit_code != 0
-        assert "--provider" in result.output
+        assert "required" in result.output.lower()
 
     def test_auth_logout_nonexistent_provider(self) -> None:
         """Test auth logout with non-existent provider."""

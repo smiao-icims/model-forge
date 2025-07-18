@@ -392,37 +392,32 @@ def auth_login(provider: str, api_key: str | None, force: bool) -> None:
 @click.option("--all-providers", is_flag=True, help="Log out from all providers")
 def auth_logout(provider: str | None, all_providers: bool) -> None:
     """Clear stored credentials for a provider."""
-    try:
-        if all_providers:
-            current_config, _ = config.get_config()
-            providers = current_config.get("providers", {})
+    if all_providers:
+        current_config, _ = config.get_config()
+        providers = current_config.get("providers", {})
 
-            for provider_name in providers:
-                try:
-                    provider_data = providers[provider_name]
-                    auth_strategy = auth.get_auth_strategy(provider_name, provider_data)
-                    auth_strategy.clear_credentials()
-                    click.echo(f"✅ Cleared credentials for '{provider_name}'")
-                except Exception as e:
-                    click.echo(
-                        f"⚠️  Failed to clear credentials for '{provider_name}': {e}"
-                    )
-        else:
-            current_config, _ = config.get_config()
-            providers = current_config.get("providers", {})
+        for provider_name in providers:
+            try:
+                provider_data = providers[provider_name]
+                auth_strategy = auth.get_auth_strategy(provider_name, provider_data)
+                auth_strategy.clear_credentials()
+                click.echo(f"✅ Cleared credentials for '{provider_name}'")
+            except Exception as e:
+                click.echo(f"⚠️  Failed to clear credentials for '{provider_name}': {e}")
+    elif provider:
+        current_config, _ = config.get_config()
+        providers = current_config.get("providers", {})
 
-            if provider not in providers:
-                click.echo(f"❌ Provider '{provider}' not found")
-                return
+        if provider not in providers:
+            click.echo(f"❌ Provider '{provider}' not found")
+            return
 
-            provider_data = providers[provider]
-            auth_strategy = auth.get_auth_strategy(provider, provider_data)
-            auth_strategy.clear_credentials()
-            click.echo(f"✅ Cleared credentials for '{provider}'")
-
-    except Exception as e:
-        logger.exception("Logout failed")
-        click.echo(f"❌ Logout failed: {e}", err=True)
+        provider_data = providers[provider]
+        auth_strategy = auth.get_auth_strategy(provider, provider_data)
+        auth_strategy.clear_credentials()
+        click.echo(f"✅ Cleared credentials for '{provider}'")
+    else:
+        raise click.BadParameter("Either --provider or --all-providers is required")
 
 
 @auth_group.command(name="status")
@@ -636,7 +631,7 @@ def _check_provider_status(
 
 
 def _invoke_with_smart_retry(
-    chain: object,
+    chain: Any,  # noqa: ANN401
     input_data: dict[str, Any],
     verbose: bool = False,
     max_retries: int = 3,
@@ -718,7 +713,7 @@ def _invoke_with_smart_retry(
 
     # If we get here, all retries failed
     logger.error("All retry attempts failed for GitHub Copilot")
-    raise last_exception
+    raise last_exception or RuntimeError("All retry attempts failed")
 
 
 if __name__ == "__main__":
