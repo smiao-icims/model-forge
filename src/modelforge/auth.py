@@ -42,7 +42,7 @@ class AuthStrategy(ABC):
         config_data, _ = get_config()
         providers = config_data.get("providers", {})
         provider_data = providers.get(self.provider_name, {})
-        return provider_data.get("auth_data", {})
+        return dict(provider_data.get("auth_data", {}))
 
     def _save_auth_data(self, auth_data: dict[str, Any]) -> None:
         """Save authentication data to config file."""
@@ -179,7 +179,7 @@ class DeviceFlowAuth(AuthStrategy):
                 self.device_code_url, data=data, headers=headers, timeout=30
             )
             response.raise_for_status()
-            return response.json()
+            return dict(response.json())
         except requests.exceptions.JSONDecodeError as e:
             logger.exception(
                 "Invalid response from %s device code endpoint",
@@ -419,11 +419,9 @@ def get_auth_strategy(
     if strategy_name == "device_flow":
         auth_details = provider_data.get("auth_details")
         if not auth_details:
-            msg = (
-                f"Provider '{provider_name}' is missing required "
-                "device flow settings."
+            raise ConfigurationError(
+                f"Provider '{provider_name}' is missing required device flow settings."
             )
-            raise ConfigurationError(msg)
 
         return DeviceFlowAuth(
             provider_name,
@@ -433,8 +431,9 @@ def get_auth_strategy(
             auth_details["scope"],
         )
 
-    msg = f"Unknown auth strategy '{strategy_name}' for provider '{provider_name}'."
-    raise ConfigurationError(msg)
+    raise ConfigurationError(
+        f"Unknown auth strategy '{strategy_name}' for provider '{provider_name}'."
+    )
 
 
 def get_credentials(

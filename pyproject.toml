@@ -139,6 +139,8 @@ warn_no_return = false
 warn_unreachable = false
 strict_equality = true
 show_error_codes = true
+ignore_missing_imports = true
+plugins = []
 
 [[tool.mypy.overrides]]
 module = [
@@ -147,6 +149,7 @@ module = [
     "langchain_community.*",
     "langchain_google_genai.*",
     "langchain_github_copilot.*",
+    "click.*",
 ]
 ignore_missing_imports = true
 

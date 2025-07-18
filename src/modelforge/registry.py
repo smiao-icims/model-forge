@@ -146,8 +146,8 @@ class ModelForgeRegistry:
                 "github_copilot": self._create_github_copilot_llm,
             }
 
-            creator = creator_map.get(llm_type)
-            if not creator:
+            creator = creator_map.get(str(llm_type))
+            if creator is None:
                 _raise_provider_error(
                     f"Unsupported llm_type '{llm_type}' for provider "
                     f"'{resolved_provider}'"
@@ -199,9 +199,7 @@ class ModelForgeRegistry:
             logger.debug("   Actual model name: %s", actual_model_name)
             logger.debug("   Base URL: %s", base_url)
 
-        return ChatOpenAI(
-            model_name=actual_model_name, api_key=api_key, base_url=base_url
-        )
+        return ChatOpenAI(model=actual_model_name, api_key=api_key, base_url=base_url)
 
     def _create_ollama_llm(
         self,
@@ -251,7 +249,7 @@ class ModelForgeRegistry:
             logger.debug("   Model alias: %s", model_alias)
             logger.debug("   Actual model name: %s", actual_model_name)
 
-        return ChatGitHubCopilot(api_key=copilot_token, model=actual_model_name)  # type: ignore
+        return ChatGitHubCopilot(api_key=copilot_token, model=actual_model_name)
 
     def _create_google_genai_llm(
         self,

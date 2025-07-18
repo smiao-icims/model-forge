@@ -30,8 +30,8 @@ def _handle_authentication(
     elif dev_auth:
         click.echo("Starting device authentication flow...")
         try:
-            auth_strategy = auth.get_auth_strategy(provider, provider_data)
-            credentials = auth_strategy.authenticate()
+            strategy = auth.get_auth_strategy(provider, provider_data)
+            credentials = strategy.authenticate()
             if credentials:
                 click.echo(f"Authentication successful for provider '{provider}'.")
             else:
@@ -113,7 +113,7 @@ def add_model(
     api_key: str | None = None,
     dev_auth: bool = False,
     local: bool = False,
-) -> None:  # noqa: PLR0913
+) -> None:
     """Add a new model configuration."""
     try:
         # Load existing configuration
@@ -204,7 +204,7 @@ def use_model(provider_name: str, model_alias: str, local: bool) -> None:
     """Set the current model to use."""
     success = config.set_current_model(provider_name, model_alias, local=local)
     if not success:
-        raise click.ClickException
+        raise click.ClickException("Model not found")
 
 
 @config_group.command(name="remove")
