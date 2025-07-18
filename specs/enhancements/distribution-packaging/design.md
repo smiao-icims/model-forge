@@ -79,7 +79,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11", "3.12"]
-    
+
   release:
     needs: test
     runs-on: ubuntu-latest
