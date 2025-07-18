@@ -22,6 +22,12 @@ from . import auth, config
 from .exceptions import ConfigurationError, ModelNotFoundError, ProviderError
 from .logging_config import get_logger
 
+
+def _raise_provider_error(message: str) -> None:
+    """Raise a ProviderError with the given message."""
+    raise ProviderError(message)
+
+
 logger = get_logger(__name__)
 
 
@@ -122,8 +128,9 @@ class ModelForgeRegistry:
 
             llm_type = provider_data.get("llm_type")
             if not llm_type:
-                msg = f"Provider '{resolved_provider}' has no 'llm_type' configured."
-                raise ProviderError(msg)
+                _raise_provider_error(
+                    f"Provider '{resolved_provider}' has no 'llm_type' configured."
+                )
 
             logger.info(
                 "Creating LLM instance for provider: %s, model: %s",
@@ -141,11 +148,10 @@ class ModelForgeRegistry:
 
             creator = creator_map.get(llm_type)
             if not creator:
-                msg = (
+                _raise_provider_error(
                     f"Unsupported llm_type '{llm_type}' for provider "
                     f"'{resolved_provider}'"
                 )
-                raise ProviderError(msg)
 
             return creator(resolved_provider, resolved_model, provider_data, model_data)
 

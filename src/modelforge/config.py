@@ -67,10 +67,10 @@ def get_config_from_path(path: Path) -> tuple[dict[str, Any], Path]:
             return config_data, path
     except json.JSONDecodeError as e:
         logger.exception("Invalid JSON in configuration file %s", path)
-        raise ConfigurationError(f"Invalid JSON in configuration file {path}") from e
+        raise ConfigurationError from e
     except OSError as e:
         logger.exception("Could not read configuration file %s", path)
-        raise ConfigurationError(f"Could not read configuration file {path}") from e
+        raise ConfigurationError from e
 
 
 def save_config(config_data: dict[str, Any], local: bool = False) -> None:
@@ -94,7 +94,7 @@ def save_config(config_data: dict[str, Any], local: bool = False) -> None:
         logger.debug("Successfully saved configuration to: %s", config_path)
     except OSError as e:
         logger.exception("Could not save config file to %s", config_path)
-        raise ConfigurationError(f"Could not save config file to {config_path}") from e
+        raise ConfigurationError from e
 
 
 def set_current_model(provider: str, model: str, local: bool = False) -> bool:

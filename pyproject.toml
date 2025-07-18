@@ -1,14 +1,19 @@
-[tool.poetry]
-name = "modelforge"
-version = "0.1.0"
-description = "A reusable library for managing LLM providers, authentication, and model selection."
-authors = ["Your Name <you@example.com>"]
-readme = "README.md"
-packages = [{include = "modelforge", from = "src"}]
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
-# Add these classifiers for better PyPI discoverability
+[project]
+name = "modelforge"
+version = "0.2.0"
+description = "A reusable library for managing LLM providers, authentication, and model selection."
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+license = {file = "LICENSE"}
+authors = [
+    {name = "ModelForge Contributors"},
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -18,33 +23,42 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
+keywords = ["llm", "ai", "langchain", "openai", "ollama", "providers", "authentication"]
+dependencies = [
+    "click>=8.1.7",
+    "requests>=2.32.3",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-google-genai>=2.1.5",
+    "langchain-github-copilot>=0.4.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-click = "^8.1.7"
-requests = "^2.32.3"
-langchain-core = "^0.3.0"
-langchain-openai = "^0.3.0"
-langchain-community = "^0.3.0"
-langchain-google-genai = "^2.1.5"
-langchain-github-copilot = "^0.4.0"
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.2",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.7.0",
+    "mypy>=1.11.0",
+    "pre-commit>=3.8.0",
+    "pytest-cov>=5.0.0",
+    "types-requests>=2.32.0",
+]
 
-[tool.poetry.scripts]
+[project.scripts]
 modelforge = "modelforge.cli:cli"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
-pytest-mock = "^3.14.0"
-# Code quality tools
-ruff = "^0.7.0"                    # Fast linter and formatter
-mypy = "^1.11.0"                   # Type checker
-pre-commit = "^3.8.0"              # Git hooks
-pytest-cov = "^5.0.0"              # Coverage reporting
-types-requests = "^2.32.0"         # Type stubs for requests
+[project.urls]
+Homepage = "https://github.com/your-org/model-forge"
+Repository = "https://github.com/your-org/model-forge"
+Issues = "https://github.com/your-org/model-forge/issues"
+Documentation = "https://model-forge.readthedocs.io"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "modelforge.__version__"}
 
 # === Code Quality Configuration ===
 
@@ -167,3 +181,6 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.poetry.group.dev.dependencies]
+twine = "^6.1.0"

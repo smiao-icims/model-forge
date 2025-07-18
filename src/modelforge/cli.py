@@ -112,9 +112,8 @@ def add_model(
     api_model_name: str | None = None,
     api_key: str | None = None,
     dev_auth: bool = False,
-    *,
     local: bool = False,
-) -> None:
+) -> None:  # noqa: PLR0913
     """Add a new model configuration."""
     try:
         # Load existing configuration

@@ -96,7 +96,7 @@ def test_device_flow_auth_success(mock_config: Mock, mock_requests: Mock) -> Non
         Mock(
             status_code=200,
             json=Mock(
-                return_value={"access_token": "test-access-token", "expires_in": 3600}
+                return_value={"access_token": "mock-access-token", "expires_in": 3600}
             ),
         ),
     ]
@@ -116,7 +116,7 @@ def test_device_flow_auth_success(mock_config: Mock, mock_requests: Mock) -> Non
     assert mock_requests.post.call_count == 3
     mock_config.save_config.assert_called()
     assert credentials is not None
-    assert credentials["access_token"] == "test-access-token"
+    assert credentials["access_token"] == "mock-access-token"  # noqa: S105
     assert "expires_at" in credentials
     assert "expires_in" in credentials
 
@@ -148,7 +148,7 @@ def test_device_flow_get_credentials_valid_token(mock_config: Mock) -> None:
 
     # Assert
     assert credentials is not None
-    assert credentials["access_token"] == "valid-token"
+    assert credentials["access_token"] == "valid-token"  # noqa: S105
     assert "expires_at" in credentials
 
 
@@ -157,7 +157,7 @@ def test_device_flow_get_credentials_expired_token(mock_config: Mock) -> None:
     # Arrange
     yesterday = datetime.now(UTC) - timedelta(days=1)
     token_info = {
-        "access_token": "expired-token",
+        "access_token": "mock-expired-token",
         "expires_at": yesterday.isoformat(),
     }
 
