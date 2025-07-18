@@ -92,13 +92,14 @@ class ApiKeyAuth(AuthStrategy):
         """Retrieve stored API key from config."""
         try:
             auth_data = self._get_auth_data()
+        except Exception:
+            logger.exception("Failed to retrieve API key for %s", self.provider_name)
+            return None
+        else:
             if auth_data and "api_key" in auth_data:
                 logger.debug("Retrieved API key for %s", self.provider_name)
                 return auth_data
             logger.warning("No stored API key found for %s", self.provider_name)
-            return None
-        except Exception:
-            logger.exception("Failed to retrieve API key for %s", self.provider_name)
             return None
 
     def clear_credentials(self) -> None:
@@ -349,13 +350,6 @@ class DeviceFlowAuth(AuthStrategy):
             )
             response.raise_for_status()
             new_token_data = response.json()
-
-            if "refresh_token" not in new_token_data:
-                new_token_data["refresh_token"] = token_info["refresh_token"]
-
-            self._save_token_info(new_token_data)
-            logger.info("Successfully refreshed token for %s", self.provider_name)
-            return new_token_data
         except requests.exceptions.RequestException:
             logger.exception(
                 "Failed to refresh token for %s. Re-authentication will be required.",
@@ -363,15 +357,23 @@ class DeviceFlowAuth(AuthStrategy):
             )
             self.clear_credentials()
             return None
+        else:
+            if "refresh_token" not in new_token_data:
+                new_token_data["refresh_token"] = token_info["refresh_token"]
+
+            self._save_token_info(new_token_data)
+            logger.info("Successfully refreshed token for %s", self.provider_name)
+            return new_token_data
 
     def get_token_info(self) -> dict[str, Any] | None:
         """Retrieve token information from config file."""
         try:
             auth_data = self._get_auth_data()
-            return auth_data if auth_data else None
         except Exception:
             logger.exception("Could not retrieve token for %s", self.provider_name)
             return None
+        else:
+            return auth_data if auth_data else None
 
     def clear_credentials(self) -> None:
         """Clear stored token from config file."""

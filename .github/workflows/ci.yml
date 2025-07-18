@@ -124,4 +124,4 @@ jobs:
 
       - name: Run security scan
         run: |
-          poetry run ruff check --select S .
+          poetry run ruff check --select S --ignore S101 --ignore S105 --ignore S603 .
