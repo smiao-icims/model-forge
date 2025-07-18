@@ -74,7 +74,7 @@ AuthStrategy (ABC)
 ```python
 # Factory mapping
 "ollama": ChatOllama
-"google_genai": ChatGoogleGenerativeAI  
+"google_genai": ChatGoogleGenerativeAI
 "openai_compatible": ChatOpenAI
 "github_copilot": ChatGitHubCopilot (with OpenAI fallback)
 ```

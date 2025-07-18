@@ -12,7 +12,7 @@ The models.dev integration will transform ModelForge from a manually configured 
 ```python
 class ModelsDevClient:
     """HTTP client for models.dev API with caching and retry logic."""
-    
+
     def __init__(self, cache_ttl: int = 86400, timeout: int = 30):
         self.base_url = "https://api.models.dev/v1"
         self.cache = ModelsDevCache()
@@ -24,7 +24,7 @@ class ModelsDevClient:
 ```python
 class ModelsDevCache:
     """Intelligent caching system for models.dev data."""
-    
+
     def __init__(self, cache_dir: Path | None = None):
         self.cache_dir = cache_dir or get_cache_dir()
         self.compressor = gzip
@@ -81,7 +81,7 @@ User Request → ModelsDevClient → Provider Template → Configuration Validat
 ```
 
 ### Cache Management
-- **TTL Strategy**: 
+- **TTL Strategy**:
   - Providers: 7 days (stable)
   - Models: 24 hours (frequent updates)
   - Individual models: 24 hours
@@ -111,7 +111,7 @@ $ modelforge discover
 
 Available Providers:
 1. OpenAI
-2. Anthropic  
+2. Anthropic
 3. Google
 4. Ollama
 
@@ -156,10 +156,10 @@ Status: Active
 class AutoConfigurator:
     def generate_provider_config(self, provider: str) -> dict[str, Any]:
         """Generate provider configuration from models.dev template."""
-        
+
     def suggest_models(self, use_case: str, constraints: dict) -> list[ModelInfo]:
         """Suggest optimal models based on criteria."""
-        
+
     def validate_existing_config(self, config: dict) -> list[str]:
         """Validate existing configuration against models.dev."""
 ```
@@ -185,7 +185,7 @@ class ModelsDevClient:
         'backoff_factor': 1,
         'status_forcelist': [429, 500, 502, 503, 504]
     }
-    
+
     TIMEOUT_CONFIG = {
         'connect': 5,
         'read': 30
@@ -230,10 +230,10 @@ class ModelsDevCacheError(ModelsDevError):
 class OfflineAdapter:
     def __init__(self, cache: ModelsDevCache):
         self.cache = cache
-        
+
     def get_available_data(self) -> dict[str, Any]:
         """Return cached data with staleness indicators."""
-        
+
     def is_data_fresh(self) -> bool:
         """Check if cached data is reasonably fresh."""
 ```
@@ -287,7 +287,7 @@ class OfflineAdapter:
 ```python
 class MockModelsDevClient(ModelsDevClient):
     """Mock client for testing without network calls."""
-    
+
     def __init__(self, fixtures_dir: Path):
         self.fixtures = self._load_fixtures(fixtures_dir)
 ```

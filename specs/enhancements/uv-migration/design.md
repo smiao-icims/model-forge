@@ -145,7 +145,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11", "3.12"]
-    
+
     steps:
     - uses: actions/checkout@v4
     - name: Install UV
@@ -243,10 +243,10 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: poetry_compat.py [install|run|build]")
         return 1
-    
+
     command = sys.argv[1]
     args = sys.argv[2:]
-    
+
     if command == "install":
         if "--dev" in args:
             subprocess.run(["uv", "pip", "install", "-e", ".[dev]"])
@@ -259,7 +259,7 @@ def main():
     else:
         print(f"Unknown command: {command}")
         return 1
-    
+
     return 0
 
 if __name__ == "__main__":
