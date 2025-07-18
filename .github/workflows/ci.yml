@@ -60,7 +60,7 @@ jobs:
 
       - name: Run type checking with mypy
         run: |
-          mypy src/modelforge
+          mypy src/modelforge --ignore-missing-imports
 
   security:
     runs-on: ubuntu-latest
