@@ -2,6 +2,7 @@
 
 import getpass
 import time
+import webbrowser
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -171,8 +172,6 @@ class DeviceFlowAuth(AuthStrategy):
 
         # Try to open browser automatically
         try:
-            import webbrowser
-
             webbrowser.open(device_code_data["verification_uri"])
             print("Browser opened automatically. If not, use the URL above.")
         except Exception:

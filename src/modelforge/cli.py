@@ -13,6 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 # Local imports
 from . import auth, config
 from .logging_config import get_logger
+from .modelsdev import ModelsDevClient
 from .registry import ModelForgeRegistry
 
 logger = get_logger(__name__)
@@ -465,8 +466,6 @@ def models() -> None:
 def list_models(provider: str | None, refresh: bool, output_format: str) -> None:
     """List available models from models.dev."""
     try:
-        from .modelsdev import ModelsDevClient
-
         client = ModelsDevClient()
         models = client.get_models(provider=provider, force_refresh=refresh)
 
@@ -520,8 +519,6 @@ def search_models(
 ) -> None:
     """Search models by name, description, or capabilities."""
     try:
-        from .modelsdev import ModelsDevClient
-
         client = ModelsDevClient()
         models = client.search_models(
             query=query,
@@ -568,8 +565,6 @@ def search_models(
 def model_info(provider: str, model: str, refresh: bool) -> None:
     """Get detailed information about a specific model."""
     try:
-        from .modelsdev import ModelsDevClient
-
         client = ModelsDevClient()
         info = client.get_model_info(
             provider=provider, model=model, force_refresh=refresh
