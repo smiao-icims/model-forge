@@ -1,264 +1,251 @@
-# Model Forge Library
+# ModelForge
 
-A reusable library for managing LLM providers, authentication, and model selection.
+A Python library for managing LLM providers, authentication, and model selection with seamless LangChain integration.
 
-This library is intended to be used by various Python-based AI projects to provide a consistent way to handle LLM interactions.
+## Installation
 
-## High-Level Design
-
-The library is composed of three core modules:
-
--   **`config`**: Manages configuration files with a two-tier system - global (`~/.config/model-forge/config.json`) and local (`./.model-forge/config.json`) - where all provider and model settings are stored.
--   **`auth`**: Provides a suite of authentication strategies (API Key, OAuth 2.0 Device Flow, and a No-Op for local models) and handles secure credential storage in configuration files.
--   **`registry`**: Acts as the main entry point and factory. It reads the configuration, invokes the appropriate authentication strategy, and instantiates ready-to-use, LangChain-compatible LLM objects.
-
-## 🛠️ **Quick Start**
-
-## **Option 1: Traditional Development Setup (Recommended)**
-Best for developers who will use ModelForge frequently:
-
+### Recommended: Virtual Environment
 ```bash
-# 1. Run setup script
-./setup.sh
+# Create and activate virtual environment
+python -m venv model-forge-env
+source model-forge-env/bin/activate  # On Windows: model-forge-env\Scripts\activate
 
-# 2. Use Poetry directly (faster for repeated use)
-poetry run modelforge config show
-poetry run modelforge config add --provider openai --model gpt-4
+# Install package
+pip install model-forge-llm
+
+# Verify installation
+modelforge --help
 ```
 
-## **Option 2: Wrapper Script (Quick Usage)**
-Best for occasional use, CI/CD, or Docker environments:
-
+### Quick Install (System-wide)
 ```bash
-# Single command that handles setup + execution
-./modelforge.sh config show
-./modelforge.sh config add --provider openai --model gpt-4
+pip install model-forge-llm
 ```
 
-**Performance Comparison:**
-- **Traditional**: ~0.9s per command
-- **Wrapper**: ~1.6s per command (includes setup overhead)
+## Quick Start
 
-## Local Development & Testing
-
-To test the library locally, you can use the built-in Command-Line Interface (CLI).
-
-**Option 1: Using the setup script (recommended)**
+### Option 1: GitHub Copilot via Device Authentication Flow
 ```bash
-./setup.sh
+# Discover GitHub Copilot models
+modelforge models list --provider github_copilot
+
+# Set up GitHub Copilot with device authentication
+modelforge auth login --provider github_copilot
+
+# Select Claude 3.7 Sonnet via GitHub Copilot
+modelforge config use --provider github_copilot --model claude-3.7-sonnet
+
+# Test your setup
+modelforge test --prompt "Write a Python function to reverse a string"
 ```
 
-**Option 2: Manual setup**
-1.  **Set up a virtual environment:**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate
-    ```
-
-2.  **Install the library in editable mode:**
-    This allows you to use the CLI and reflects any code changes immediately without reinstalling.
-    ```bash
-    pip install -e .
-    ```
-
-3.  **Use the CLI to manage your models:**
-    ```bash
-    # Show the current configuration
-    modelforge config show
-
-    # Add a local Ollama model
-    modelforge config add --provider ollama --model qwen3:1.7b
-
-    # Add OpenAI models with API key
-    modelforge config add --provider openai --model gpt-4o-mini --api-key "YOUR_API_KEY_HERE"
-    modelforge config add --provider openai --model gpt-4o --api-model-name "gpt-4o" --api-key "YOUR_API_KEY_HERE"
-
-    # Add a provider requiring an API key (Google Gemini)
-    modelforge config add --provider google --model gemini-pro --api-model-name "gemini-1.5-pro" --api-key "YOUR_API_KEY_HERE"
-
-    # Add GitHub Copilot and trigger the device authentication flow
-    modelforge config add --provider github_copilot --model claude-3.7-sonnet --dev-auth
-
-    # Set a model to be the default
-    modelforge config use --provider ollama --model qwen3:1.7b
-    ```
-
-## Available Models and Providers
-
-**📚 Model Reference:**
-For a comprehensive list of available providers and models, visit **[models.dev](https://models.dev)** - your go-to resource for:
-
-- **Provider Documentation**: Detailed information about each LLM provider
-- **Model Specifications**: Complete model listings with capabilities and pricing
-- **API References**: Authentication methods and integration guides
-- **Model Comparisons**: Performance metrics and use case recommendations
-
-**Supported Providers:**
-- **OpenAI**: GPT-4, GPT-4o, GPT-3.5-turbo, and more
-- **Ollama**: Local models like Llama, Qwen, Mistral, and others
-- **GitHub Copilot**: Claude, GPT-4, and other models via GitHub *(Enhanced Support)*
-- **Google Gemini**: Gemini Pro, Gemini Flash, and other Google models
-
-### 🚀 **Enhanced GitHub Copilot Support**
-
-ModelForge provides **two-tier GitHub Copilot integration** for optimal performance:
-
-#### **🎯 Tier 1: Dedicated ChatGitHubCopilot (Recommended)**
-When `langchain-github-copilot` is installed, ModelForge uses the specialized GitHub Copilot class:
-
+### Option 2: OpenAI (API Key Required)
 ```bash
-# Install the enhanced GitHub Copilot support
-poetry add langchain-github-copilot
+# Add OpenAI with your API key
+modelforge auth login --provider openai --api-key YOUR_API_KEY
 
-# Add GitHub Copilot with device authentication
-./modelforge.sh config add --provider github_copilot --model claude-3.7-sonnet --dev-auth
+# Select GPT-4o-mini
+modelforge config use --provider openai --model gpt-4o-mini
+
+# Test your setup
+modelforge test --prompt "Hello, world!"
 ```
 
-**Benefits:**
-- ✅ **Optimized for 25-minute token lifecycle**
-- ✅ **GitHub-specific rate limiting**
-- ✅ **Enhanced error handling**
-- ✅ **Built-in token refresh**
-
-#### **🔄 Tier 2: OpenAI-Compatible Fallback**
-If `langchain-github-copilot` is not available, ModelForge automatically falls back to OpenAI-compatible mode:
-
+### Option 3: Local Ollama (No API Key Needed)
 ```bash
-# Works even without langchain-github-copilot installed
-./modelforge.sh config add --provider github_copilot --model claude-3.7-sonnet --dev-auth
+# Make sure Ollama is running locally
+# Then add a local model
+modelforge config add --provider ollama --model qwen3:1.7b
+
+# Select the local model
+modelforge config use --provider ollama --model qwen3:1.7b
+
+# Test your setup
+modelforge test --prompt "What is machine learning?"
 ```
 
-**Characteristics:**
-- ⚡ **Universal compatibility**
-- 🛠️ **Manual token management**
-- 📊 **Standard OpenAI interface**
-
-#### **🔍 Installation Options**
-
+### Common Commands - Complete Lifecycle
 ```bash
-# Option 1: Full installation with GitHub Copilot enhancement
-git clone <repo>
-cd model-forge
-./setup.sh
-poetry add langchain-github-copilot
+# Installation & Setup
+modelforge --help                                   # Verify installation
+modelforge config show                             # View current config
 
-# Option 2: Basic installation (fallback mode)
-git clone <repo>
-cd model-forge
-./setup.sh
-# Uses OpenAI-compatible fallback automatically
+# Model Discovery & Selection
+modelforge models list                             # List all available models
+modelforge models search "claude"                   # Search models by name
+modelforge models info --provider openai --model gpt-4o  # Get model details
+
+# Authentication Management
+modelforge auth login --provider openai --api-key KEY   # API key auth
+modelforge auth login --provider github_copilot         # Device flow auth
+modelforge auth status                                 # Check auth status
+modelforge auth logout --provider openai               # Remove credentials
+
+# Configuration Management
+modelforge config add --provider openai --model gpt-4o-mini --api-key KEY
+modelforge config add --provider ollama --model qwen3:1.7b --local
+modelforge config use --provider openai --model gpt-4o-mini
+modelforge config remove --provider openai --model gpt-4o-mini
+
+# Testing & Usage
+modelforge test --prompt "Hello, how are you?"        # Test current model
+modelforge test --prompt "Explain quantum computing" --verbose  # Debug mode
+
+# Cache & Maintenance
+modelforge models list --refresh                     # Force refresh from models.dev
 ```
 
-Use [models.dev](https://models.dev) to explore the full ecosystem and find the perfect model for your use case!
+## Python API
 
-## Configuration System
+### Basic Usage
 
-ModelForge uses a **two-tier configuration system** that provides flexibility for both personal and project-specific setups:
+```python
+from modelforge.registry import ModelForgeRegistry
 
-### 🌍 **Global Configuration** (`~/.config/model-forge/config.json`)
-- **Location**: User's config directory (follows XDG Base Directory Standard)
-- **Purpose**: System-wide model configurations shared across all projects
-- **Use case**: Personal API keys, frequently used models, default settings
+# Initialize registry
+registry = ModelForgeRegistry()
 
-### 📁 **Local Configuration** (`./.model-forge/config.json`)
-- **Location**: Current working directory (project-specific)
-- **Purpose**: Project-specific model configurations
-- **Use case**: Team projects, specific model requirements, environment-specific settings
+# Get currently configured model
+llm = registry.get_llm()
 
-### 🔄 **Precedence Rules**
-1. **Local First**: If a local config exists, it takes precedence
-2. **Global Fallback**: If no local config, the global config is used
-3. **Auto-Creation**: If neither exists, a new global config is created
+# Use directly with LangChain
+from langchain_core.prompts import ChatPromptTemplate
 
-### 💡 **Managing Configurations**
-```bash
-# View current configuration (shows which config is active)
-modelforge config show
-
-# Add to global configuration (default)
-modelforge config add --provider openai --model gpt-4o --api-key "YOUR_KEY"
-
-# Add to local configuration (project-specific)
-modelforge config add --provider openai --model gpt-4o --api-key "YOUR_KEY" --local
+prompt = ChatPromptTemplate.from_messages([("human", "{input}")])
+chain = prompt | llm
+response = chain.invoke({"input": "Tell me a joke"})
+print(response)
 ```
 
-Both configuration files use the same JSON structure and are fully compatible with all ModelForge features.
+### Advanced Usage
 
-## Code Quality & Development
+```python
+from modelforge.registry import ModelForgeRegistry
 
-ModelForge maintains high code quality standards with automated tooling:
+# Initialize with debug logging
+registry = ModelForgeRegistry(verbose=True)
 
-### 🔧 **Quality Tools**
-- **Ruff**: Fast linting and formatting
-- **MyPy**: Type checking for reliability
-- **Pre-commit**: Automated quality checks
-- **GitHub Actions**: CI/CD pipeline
-- **Pytest**: Comprehensive testing with coverage
+# Get specific model by provider and name
+llm = registry.get_llm(provider_name="openai", model_alias="gpt-4o-mini")
 
-### 📋 **Code Review Guidelines**
-We provide comprehensive code review guidelines for consistent quality:
-- **[Detailed Guidelines](CODE_REVIEW_GUIDELINES.md)**: Complete review criteria and examples
-- **[LLM Prompt](PROMPT_CODE_REVIEW.md)**: Quick prompt for AI-assisted code reviews
+# Use with full LangChain features
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 
-### 🚀 **Development Commands**
-```bash
-# Format and check code
-poetry run ruff format .
-poetry run ruff check .
+# Create complex chains
+prompt = ChatPromptTemplate.from_template("Explain {topic} in simple terms")
+chain = prompt | llm | StrOutputParser()
 
-# Type checking
-poetry run mypy src/modelforge
+# Use with streaming
+for chunk in chain.stream({"topic": "quantum computing"}):
+    print(chunk, end="", flush=True)
 
-# Run tests with coverage
-poetry run pytest --cov=src/modelforge
-
-# Run all quality checks
-poetry run pre-commit run --all-files
+# Batch processing
+questions = [
+    "What is machine learning?",
+    "Explain neural networks",
+    "How does backpropagation work?"
+]
+responses = chain.batch([{"topic": q} for q in questions])
 ```
 
-## Integration Guide
+### Configuration Management
 
-To use this library in a host application (e.g., RAG-Forge):
+```python
+from modelforge import config
 
-1.  **Install the library:**
-    ```bash
-    # Quick setup (recommended for development)
-    cd /path/to/model-forge && ./setup.sh
+# Get current model selection
+current = config.get_current_model()
+print(f"Current: {current.get('provider')}/{current.get('model')}")
 
-    # Or install manually from a local path
-    pip install -e /path/to/model-forge
+# Check if models are configured
+if not current:
+    print("No model selected. Configure with:")
+    print("modelforge config add --provider openai --model gpt-4o-mini")
+```
 
-    # In the future, you would install from a package registry like PyPI
-    # pip install model-forge
-    ```
+### Error Handling
 
-2.  **Use the `ModelForgeRegistry` in your application:**
-    ```python
-    from modelforge.registry import ModelForgeRegistry
+```python
+from modelforge.registry import ModelForgeRegistry
+from modelforge.exceptions import ConfigurationError, ProviderError
 
-    # 1. Initialize the registry
+try:
     registry = ModelForgeRegistry()
+    llm = registry.get_llm()
+    response = llm.invoke("Hello world")
+except ConfigurationError as e:
+    print(f"Configuration issue: {e}")
+    print("Run: modelforge config add --provider PROVIDER --model MODEL")
+except ProviderError as e:
+    print(f"Provider error: {e}")
+    print("Check: modelforge auth status")
+```
 
-    # 2. See which models the user has configured
-    available_models = registry.list_models()
-    print(f"Available models: {available_models}")
-    # Example output: ['ollama/qwen3:1.7b', 'github_copilot/claude-3.7-sonnet']
+## Supported Providers
 
-    # 3. Get a fully authenticated model instance
-    if available_models:
-        model_id = available_models[0]
-        llm = registry.get_model_instance(model_id)
+- **OpenAI**: GPT-4, GPT-4o, GPT-3.5-turbo
+- **Google**: Gemini Pro, Gemini Flash
+- **Ollama**: Local models (Llama, Qwen, Mistral)
+- **GitHub Copilot**: Claude, GPT models via GitHub
 
-        if llm:
-            # Now you have a LangChain-compatible LLM object to use
-            response = llm.invoke("Tell me a joke.")
-            print(response)
-    ```
+## Authentication
 
-## Features
+ModelForge supports multiple authentication methods:
 
-- **Multi-Provider Support**: OpenAI, Ollama, GitHub Copilot, Google Gemini
-- **Flexible Authentication**: API Key, OAuth 2.0 Device Flow, Local (no auth)
-- **Secure Credential Storage**: Stores API keys and tokens in configuration files
-- **LangChain Integration**: Provides ready-to-use LangChain-compatible model instances
-- **Centralized Configuration**: Single configuration file managing all providers and models
+- **API Keys**: Store securely in configuration
+- **Device Flow**: Browser-based OAuth for GitHub Copilot
+- **No Auth**: For local models like Ollama
+
+```bash
+# API Key authentication
+modelforge auth login --provider openai --api-key YOUR_KEY
+
+# Device flow (GitHub Copilot)
+modelforge auth login --provider github_copilot
+
+# Check auth status
+modelforge auth status
+```
+
+## Configuration
+
+ModelForge uses a two-tier configuration system:
+
+- **Global**: `~/.config/model-forge/config.json` (user-wide)
+- **Local**: `./.model-forge/config.json` (project-specific)
+
+Local config takes precedence over global when both exist.
+
+## Model Discovery
+
+```bash
+# List all available models
+modelforge models list
+
+# Search models by name or capability
+modelforge models search "gpt"
+
+# Get detailed model info
+modelforge models info --provider openai --model gpt-4o
+```
+
+## Development Setup
+
+For contributors and developers:
+
+```bash
+git clone https://github.com/smiao-icims/model-forge.git
+cd model-forge
+poetry install
+poetry run pytest
+```
+
+## Documentation
+
+- [Models.dev](https://models.dev) - Comprehensive model reference
+- [GitHub Issues](https://github.com/smiao-icims/model-forge/issues) - Support and bug reports
+
+## License
+
+MIT License - see LICENSE file for details.
