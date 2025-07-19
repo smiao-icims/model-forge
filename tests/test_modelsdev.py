@@ -7,8 +7,6 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-import requests
 from requests_mock import Mocker
 
 from modelforge.modelsdev import ModelsDevClient
@@ -21,7 +19,7 @@ class TestModelsDevClient:
         """Test client initialization."""
         client = ModelsDevClient()
         assert client.api_key is None
-        assert client.BASE_URL == "https://models.dev/api/v1"
+        assert client.BASE_URL == "https://models.dev"
 
     def test_init_with_api_key(self) -> None:
         """Test client initialization with API key."""
@@ -39,16 +37,28 @@ class TestModelsDevClient:
 
     def test_get_providers_success(self, requests_mock: Mocker) -> None:
         """Test successful providers retrieval."""
-        mock_providers = [
-            {"name": "openai", "display_name": "OpenAI"},
-            {"name": "anthropic", "display_name": "Anthropic"},
-        ]
-        requests_mock.get("https://models.dev/api/v1/providers", json=mock_providers)
+        mock_data = {
+            "openai": {
+                "name": "OpenAI",
+                "doc": "OpenAI API",
+                "api": "https://api.openai.com/v1",
+            },
+            "anthropic": {
+                "name": "Anthropic",
+                "doc": "Anthropic API",
+                "api": "https://api.anthropic.com",
+            },
+        }
+        requests_mock.get("https://models.dev/api.json", json=mock_data)
 
         client = ModelsDevClient()
-        providers = client.get_providers()
+        providers = client.get_providers(force_refresh=True)
 
-        assert providers == mock_providers
+        assert len(providers) == 2
+        assert providers[0]["name"] == "openai"
+        assert providers[0]["display_name"] == "OpenAI"
+        assert providers[1]["name"] == "anthropic"
+        assert providers[1]["display_name"] == "Anthropic"
 
     def test_get_providers_cached(self) -> None:
         """Test providers retrieval from cache."""
@@ -76,28 +86,59 @@ class TestModelsDevClient:
 
     def test_get_models_success(self, requests_mock: Mocker) -> None:
         """Test successful models retrieval."""
-        mock_models = [
-            {"name": "gpt-4", "provider": "openai"},
-            {"name": "claude-3", "provider": "anthropic"},
-        ]
-        requests_mock.get("https://models.dev/api/v1/models", json=mock_models)
+        mock_data = {
+            "openai": {
+                "models": {
+                    "gpt-4": {
+                        "display_name": "GPT-4",
+                        "description": "GPT-4 model",
+                        "capabilities": ["chat"],
+                        "context_length": 8192,
+                        "max_tokens": 4096,
+                        "pricing": {"input": 0.03, "output": 0.06},
+                    },
+                    "gpt-3.5-turbo": {
+                        "display_name": "GPT-3.5 Turbo",
+                        "description": "GPT-3.5 Turbo model",
+                        "capabilities": ["chat"],
+                        "context_length": 4096,
+                        "max_tokens": 4096,
+                        "pricing": {"input": 0.0015, "output": 0.002},
+                    },
+                }
+            }
+        }
+        requests_mock.get("https://models.dev/api.json", json=mock_data)
 
         client = ModelsDevClient()
-        models = client.get_models()
+        models = client.get_models(force_refresh=True)
 
-        assert models == mock_models
+        assert len(models) == 2
+        assert models[0]["id"] == "gpt-4"
+        assert models[0]["provider"] == "openai"
+        assert models[0]["display_name"] == "GPT-4"
 
     def test_get_models_with_provider_filter(self, requests_mock: Mocker) -> None:
         """Test models retrieval with provider filter."""
-        mock_models = [{"name": "gpt-4", "provider": "openai"}]
-        requests_mock.get(
-            "https://models.dev/api/v1/models?provider=openai", json=mock_models
-        )
+        mock_data = {
+            "openai": {
+                "models": {
+                    "gpt-4": {
+                        "display_name": "GPT-4",
+                        "description": "GPT-4 model",
+                        "capabilities": ["chat"],
+                    }
+                }
+            }
+        }
+        requests_mock.get("https://models.dev/api.json", json=mock_data)
 
         client = ModelsDevClient()
-        models = client.get_models(provider="openai")
+        models = client.get_models(provider="openai", force_refresh=True)
 
-        assert models == mock_models
+        assert len(models) == 1
+        assert models[0]["id"] == "gpt-4"
+        assert models[0]["provider"] == "openai"
 
     def test_get_model_info_success(self, requests_mock: Mocker) -> None:
         """Test successful model info retrieval."""
@@ -117,23 +158,29 @@ class TestModelsDevClient:
 
     def test_search_models(self, requests_mock: Mocker) -> None:
         """Test model search functionality."""
-        mock_models = [
-            {
-                "name": "gpt-4",
-                "provider": "openai",
-                "description": "Advanced language model",
-                "capabilities": ["chat", "code"],
-                "pricing": {"input_per_1k_tokens": 0.03},
+        mock_data = {
+            "openai": {
+                "models": {
+                    "gpt-4": {
+                        "display_name": "GPT-4",
+                        "description": "Advanced language model",
+                        "capabilities": ["chat", "code"],
+                        "pricing": {"input": 0.03},
+                    }
+                }
             },
-            {
-                "name": "claude-3",
-                "provider": "anthropic",
-                "description": "Claude model",
-                "capabilities": ["chat"],
-                "pricing": {"input_per_1k_tokens": 0.08},
+            "anthropic": {
+                "models": {
+                    "claude-3": {
+                        "display_name": "Claude 3",
+                        "description": "Claude model",
+                        "capabilities": ["chat"],
+                        "pricing": {"input": 0.08},
+                    }
+                }
             },
-        ]
-        requests_mock.get("https://models.dev/api/v1/models", json=mock_models)
+        }
+        requests_mock.get("https://models.dev/api.json", json=mock_data)
 
         # Mock the CACHE_DIR to prevent real cache usage
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -144,19 +191,21 @@ class TestModelsDevClient:
                 client = ModelsDevClient()
 
                 # Test basic search
-                results = client.search_models("gpt")
+                results = client.search_models("gpt", force_refresh=True)
                 assert len(results) == 1
-                assert results[0]["name"] == "gpt-4"
+                assert results[0]["id"] == "gpt-4"
 
                 # Test capability filter
-                results = client.search_models("", capabilities=["code"])
+                results = client.search_models(
+                    "", capabilities=["code"], force_refresh=True
+                )
                 assert len(results) == 1
-                assert results[0]["name"] == "gpt-4"
+                assert results[0]["id"] == "gpt-4"
 
-                # Test price filter
-                results = client.search_models("", max_price=0.05)
+                # Test price filter - note: pricing structure changed
+                results = client.search_models("", max_price=0.05, force_refresh=True)
                 assert len(results) == 1
-                assert results[0]["name"] == "gpt-4"
+                assert results[0]["id"] == "gpt-4"
 
     def test_clear_cache(self) -> None:
         """Test cache clearing functionality."""
@@ -178,7 +227,7 @@ class TestModelsDevClient:
 
     def test_network_error_handling(self, requests_mock: Mocker) -> None:
         """Test handling of network errors."""
-        requests_mock.get("https://models.dev/api/v1/providers", status_code=500)
+        requests_mock.get("https://models.dev/api.json", status_code=500)
 
         # Mock the CACHE_DIR to use a temp directory with no cache
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -188,9 +237,9 @@ class TestModelsDevClient:
             with patch.object(ModelsDevClient, "CACHE_DIR", cache_dir):
                 client = ModelsDevClient()
 
-                # Should raise exception when no cache available
-                with pytest.raises(requests.exceptions.HTTPError):
-                    client.get_providers()
+                # Should return empty list when no cache available
+                providers = client.get_providers()
+                assert providers == []
 
     def test_cache_validation(self) -> None:
         """Test cache TTL validation."""

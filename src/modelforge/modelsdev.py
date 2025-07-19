@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 class ModelsDevClient:
     """Client for interacting with models.dev API."""
 
-    BASE_URL = "https://models.dev/api/v1"
+    BASE_URL = "https://models.dev"
     CACHE_DIR = Path.home() / ".cache" / "model-forge" / "modelsdev"
 
     # Cache TTL in seconds
@@ -81,16 +81,54 @@ class ModelsDevClient:
         except OSError as e:
             logger.warning("Failed to write cache file %s: %s", cache_path, e)
 
-    def get_providers(self, force_refresh: bool = False) -> list[dict[str, Any]]:
-        """Get list of supported providers from models.dev.
+    def _parse_provider_data(self, data: dict[str, Any]) -> list[dict[str, Any]]:
+        """Parse provider data from models.dev API response."""
+        providers = []
+        for provider_key, provider_data in data.items():
+            if not isinstance(provider_data, dict):
+                continue
 
-        Args:
-            force_refresh: Force refresh from API even if cache is valid
+            provider_info = {
+                "name": provider_key,
+                "display_name": provider_data.get("name", provider_key.title()),
+                "description": provider_data.get("doc", f"{provider_key.title()} AI"),
+                "auth_types": ["api_key"],  # Default
+                "base_urls": [provider_data.get("api", "")]
+                if provider_data.get("api")
+                else [],
+            }
 
-        Returns:
-            List of provider information dictionaries
-        """
-        cache_path = self._get_cache_path("providers")
+            # Determine auth type
+            if provider_key == "ollama":
+                provider_info["auth_types"] = ["none"]
+            elif provider_key == "github":
+                provider_info["auth_types"] = ["device_flow"]
+            elif "env" in provider_data:
+                env_vars = provider_data["env"]
+                if env_vars and isinstance(env_vars, list) and env_vars:
+                    has_api_key = any("API_KEY" in str(env) for env in env_vars)
+                    if has_api_key:
+                        provider_info["auth_types"] = ["api_key"]
+
+            providers.append(provider_info)
+        return providers
+
+    def _handle_network_error(self, cache_path: Path) -> list[dict[str, Any]]:
+        """Handle network errors by using cached data if available."""
+        cached_data = self._load_from_cache(cache_path)
+        result: list[dict[str, Any]] = []
+        if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
+            logger.info("Using stale cached providers data")
+            cached_result = cached_data["data"]
+            if isinstance(cached_result, list):
+                result = cached_result
+        return result
+
+    def _fetch_providers(
+        self, cache_path: Path, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
+        """Fetch providers from API or cache."""
+        providers: list[dict[str, Any]] = []
 
         if not force_refresh and self._is_cache_valid(
             cache_path, self.CACHE_TTL["providers"]
@@ -98,59 +136,76 @@ class ModelsDevClient:
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 data = cached_data["data"]
-                if isinstance(data, list):
-                    return data
-                return [data]
+                return data if isinstance(data, list) else [data]
 
         try:
-            response = self.session.get(f"{self.BASE_URL}/providers")
+            response = self.session.get(f"{self.BASE_URL}/api.json")
             response.raise_for_status()
-            providers_data = response.json()
-            providers: list[dict[str, Any]] = (
-                [providers_data]
-                if isinstance(providers_data, dict)
-                else providers_data
-                if isinstance(providers_data, list)
-                else [providers_data]
-            )
-        except requests.exceptions.ConnectionError:
-            logger.exception("Connection error while fetching providers")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                logger.info("Using stale cached providers data")
-                return cached_data["data"]
-            raise
+
+            if not response.content.strip():
+                logger.warning("Empty response from providers API")
+                return providers
+
+            data = response.json()
+            if isinstance(data, dict):
+                providers = self._parse_provider_data(data)
+
+            self._save_to_cache(cache_path, {"data": providers})
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            logger.exception("Network error while fetching providers")
+            providers = self._handle_network_error(cache_path)
         except requests.exceptions.HTTPError:
             logger.exception("HTTP error while fetching providers")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                logger.info("Using stale cached providers data")
-                return cached_data["data"]
-            raise
-        except requests.exceptions.Timeout:
-            logger.exception("Timeout while fetching providers")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                logger.info("Using stale cached providers data")
-                return cached_data["data"]
-            raise
-        else:
-            self._save_to_cache(cache_path, {"data": providers})
-            return providers
+            providers = self._handle_network_error(cache_path)
+        except requests.exceptions.JSONDecodeError:
+            logger.exception("Invalid JSON response from providers API")
+        except (ValueError, KeyError):
+            logger.exception("Data format error in providers API response")
 
-    def get_models(
-        self, provider: str | None = None, force_refresh: bool = False
+        return providers
+
+    def get_providers(self, force_refresh: bool = False) -> list[dict[str, Any]]:
+        """Get list of supported providers from models.dev."""
+        cache_path = self._get_cache_path("providers")
+        return self._fetch_providers(cache_path, force_refresh)
+
+    def _parse_model_data(
+        self, data: dict[str, Any], provider_filter: str | None = None
     ) -> list[dict[str, Any]]:
-        """Get list of models from models.dev.
+        """Parse model data from models.dev API response."""
+        models = []
+        for provider_key, provider_data in data.items():
+            if not isinstance(provider_data, dict) or "models" not in provider_data:
+                continue
 
-        Args:
-            provider: Optional provider filter
-            force_refresh: Force refresh from API even if cache is valid
+            provider_models = provider_data["models"]
+            if not isinstance(provider_models, dict):
+                continue
 
-        Returns:
-            List of model information dictionaries
-        """
-        cache_path = self._get_cache_path("models", provider or "all")
+            for model_key, model_info in provider_models.items():
+                # Filter by provider if specified
+                if provider_filter and provider_key != provider_filter:
+                    continue
+
+                # Normalize model data
+                normalized_model = {
+                    "id": model_key,
+                    "provider": provider_key,
+                    "display_name": model_info.get("display_name", model_key),
+                    "description": model_info.get("description", ""),
+                    "capabilities": model_info.get("capabilities", []),
+                    "context_length": model_info.get("context_length"),
+                    "max_tokens": model_info.get("max_tokens"),
+                    "pricing": model_info.get("pricing"),
+                }
+                models.append(normalized_model)
+        return models
+
+    def _fetch_models(
+        self, cache_path: Path, provider: str | None = None, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
+        """Fetch models from API or cache."""
+        models: list[dict[str, Any]] = []
 
         if not force_refresh and self._is_cache_valid(
             cache_path, self.CACHE_TTL["models"]
@@ -158,61 +213,50 @@ class ModelsDevClient:
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
                 data = cached_data["data"]
-                if isinstance(data, list):
-                    return data
-                return [data]
+                return data if isinstance(data, list) else [data]
 
         try:
-            url = f"{self.BASE_URL}/models"
-            params = {}
-            if provider:
-                params["provider"] = provider
-
-            response = self.session.get(url, params=params)
+            response = self.session.get(f"{self.BASE_URL}/api.json")
             response.raise_for_status()
-            models_data = response.json()
-            models: list[dict[str, Any]] = (
-                models_data if isinstance(models_data, list) else [models_data]
-            )
-        except requests.exceptions.ConnectionError:
-            logger.exception("Connection error while fetching models")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                logger.info("Using stale cached models data")
-                return cached_data["data"]
-            raise
-        except requests.exceptions.HTTPError:
-            logger.exception("HTTP error while fetching models")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                logger.info("Using stale cached models data")
-                return cached_data["data"]
-            raise
-        except requests.exceptions.Timeout:
-            logger.exception("Timeout while fetching models")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict) and "data" in cached_data:
-                logger.info("Using stale cached models data")
-                return cached_data["data"]
-            raise
-        else:
+
+            if not response.content.strip():
+                logger.warning("Empty response from models API")
+                return models
+
+            data = response.json()
+            if isinstance(data, dict):
+                models = self._parse_model_data(data, provider)
+
             self._save_to_cache(cache_path, {"data": models})
-            return models
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            logger.exception("Network error while fetching models")
+            models = self._handle_network_error(cache_path)
+        except requests.exceptions.HTTPError as e:
+            logger.exception("HTTP error while fetching models")
+            if e.response.status_code == 404:
+                logger.warning("Models API endpoint not found")
+            else:
+                models = self._handle_network_error(cache_path)
+        except requests.exceptions.JSONDecodeError:
+            logger.exception("Invalid JSON response from models API")
+        except (ValueError, KeyError):
+            logger.exception("Data format error in models API response")
+            models = self._handle_network_error(cache_path)
 
-    def get_model_info(
-        self, provider: str, model: str, force_refresh: bool = False
+        return models
+
+    def get_models(
+        self, provider: str | None = None, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
+        """Get list of models from models.dev."""
+        cache_path = self._get_cache_path("models", provider or "all")
+        return self._fetch_models(cache_path, provider, force_refresh)
+
+    def _fetch_model_info(
+        self, cache_path: Path, provider: str, model: str, force_refresh: bool = False
     ) -> dict[str, Any]:
-        """Get detailed information about a specific model.
-
-        Args:
-            provider: Provider name
-            model: Model identifier
-            force_refresh: Force refresh from API even if cache is valid
-
-        Returns:
-            Model information dictionary
-        """
-        cache_path = self._get_cache_path("model_info", provider, model)
+        """Fetch model info from API or cache."""
+        model_info: dict[str, Any] = {}
 
         if not force_refresh and self._is_cache_valid(
             cache_path, self.CACHE_TTL["model_info"]
@@ -225,10 +269,14 @@ class ModelsDevClient:
             url = f"{self.BASE_URL}/models/{provider}/{model}"
             response = self.session.get(url)
             response.raise_for_status()
-            model_info = response.json()
-            if not isinstance(model_info, dict):
-                model_info = {"model": model_info}
-        except requests.exceptions.ConnectionError:
+            api_response = response.json()
+            if isinstance(api_response, dict):
+                model_info = api_response
+            else:
+                model_info = {"model": api_response}
+
+            self._save_to_cache(cache_path, model_info)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             logger.exception("Connection error while fetching model info")
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict):
@@ -242,30 +290,21 @@ class ModelsDevClient:
                 logger.info("Using stale cached model info")
                 return cached_data
             raise
-        except requests.exceptions.Timeout:
-            logger.exception("Timeout while fetching model info")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict):
-                logger.info("Using stale cached model info")
-                return cached_data
-            raise
-        else:
-            self._save_to_cache(cache_path, model_info)
-            return model_info
 
-    def get_provider_config(
-        self, provider: str, force_refresh: bool = False
+        return model_info
+
+    def get_model_info(
+        self, provider: str, model: str, force_refresh: bool = False
     ) -> dict[str, Any]:
-        """Get configuration template for a provider.
+        """Get detailed information about a specific model."""
+        cache_path = self._get_cache_path("model_info", provider, model)
+        return self._fetch_model_info(cache_path, provider, model, force_refresh)
 
-        Args:
-            provider: Provider name
-            force_refresh: Force refresh from API even if cache is valid
-
-        Returns:
-            Provider configuration template
-        """
-        cache_path = self._get_cache_path("provider_config", provider)
+    def _fetch_provider_config(
+        self, cache_path: Path, provider: str, force_refresh: bool = False
+    ) -> dict[str, Any]:
+        """Fetch provider config from API or cache."""
+        provider_config: dict[str, Any] = {}
 
         if not force_refresh and self._is_cache_valid(
             cache_path, self.CACHE_TTL["provider_config"]
@@ -278,11 +317,14 @@ class ModelsDevClient:
             url = f"{self.BASE_URL}/providers/{provider}/config"
             response = self.session.get(url)
             response.raise_for_status()
-            provider_config = response.json()
-            if not isinstance(provider_config, dict):
-                provider_config = {"config": provider_config}
-            return provider_config
-        except requests.exceptions.ConnectionError:
+            api_response = response.json()
+            if isinstance(api_response, dict):
+                provider_config = api_response
+            else:
+                provider_config = {"config": api_response}
+
+            self._save_to_cache(cache_path, provider_config)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             logger.exception("Connection error while fetching provider config")
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict):
@@ -296,16 +338,15 @@ class ModelsDevClient:
                 logger.info("Using stale cached provider config")
                 return cached_data
             raise
-        except requests.exceptions.Timeout:
-            logger.exception("Timeout while fetching provider config")
-            cached_data = self._load_from_cache(cache_path)
-            if cached_data and isinstance(cached_data, dict):
-                logger.info("Using stale cached provider config")
-                return cached_data
-            raise
-        else:
-            self._save_to_cache(cache_path, provider_config)
-            return provider_config
+
+        return provider_config
+
+    def get_provider_config(
+        self, provider: str, force_refresh: bool = False
+    ) -> dict[str, Any]:
+        """Get configuration template for a provider."""
+        cache_path = self._get_cache_path("provider_config", provider)
+        return self._fetch_provider_config(cache_path, provider, force_refresh)
 
     def clear_cache(self) -> None:
         """Clear all cached data."""
@@ -324,25 +365,15 @@ class ModelsDevClient:
         max_price: float | None = None,
         force_refresh: bool = False,
     ) -> list[dict[str, Any]]:
-        """Search models based on criteria.
-
-        Args:
-            query: Search query string
-            provider: Optional provider filter
-            capabilities: Optional list of required capabilities
-            max_price: Optional maximum price filter
-            force_refresh: Force refresh from API
-
-        Returns:
-            List of matching models
-        """
+        """Search models based on criteria."""
         models = self.get_models(provider=provider, force_refresh=force_refresh)
 
         results = []
         for model in models:
-            # Text search in name and description
+            # Text search in id, display_name and description
             model_text = (
-                f"{model.get('name', '')} {model.get('description', '')}".lower()
+                f"{model.get('id', '')} {model.get('display_name', '')} "
+                f"{model.get('description', '')}".lower()
             )
             if query.lower() not in model_text:
                 continue
@@ -355,7 +386,8 @@ class ModelsDevClient:
 
             # Price filter
             if max_price is not None:
-                price = model.get("pricing", {}).get("input_per_1k_tokens")
+                pricing = model.get("pricing", {})
+                price = pricing.get("input") or pricing.get("input_per_1k_tokens")
                 if price is not None and price > max_price:
                     continue
 
