@@ -147,13 +147,13 @@ class ModelForgeRegistry:
             }
 
             creator = creator_map.get(str(llm_type))
-            if creator is None:
+            if not creator:
                 _raise_provider_error(
                     f"Unsupported llm_type '{llm_type}' for provider "
                     f"'{resolved_provider}'"
                 )
 
-            return creator(resolved_provider, resolved_model, provider_data, model_data)
+            return creator(resolved_provider, resolved_model, provider_data, model_data)  # type: ignore[misc]
 
         except (ConfigurationError, ProviderError, ModelNotFoundError):
             logger.exception("Failed to create LLM")
