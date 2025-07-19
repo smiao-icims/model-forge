@@ -9,19 +9,23 @@
 - **FR-004**: Support provider-specific configuration templates from models.dev
 - **FR-005**: Enable model selection based on models.dev metadata
 
-### CLI Enhancement
-- **FR-006**: Add `modelforge discover` command to browse models.dev inventory
-- **FR-007**: Add `modelforge search` command to search models by criteria
-- **FR-008**: Provide interactive model selection with models.dev metadata
-- **FR-009**: Show model details (pricing, context window, capabilities) from models.dev
-- **FR-010**: Enable filtering by provider, capabilities, or pricing
+### CLI Enhancement (Revised for Provider-Auth Model)
+- **FR-006**: Add `modelforge auth login --provider <provider>` for provider authentication
+- **FR-007**: Add `modelforge auth status --provider <provider>` to check authentication status
+- **FR-008**: Add `modelforge auth logout --provider <provider>` to clear provider credentials
+- **FR-009**: Add `modelforge models list --provider <provider>` to browse models.dev inventory
+- **FR-010**: Add `modelforge models search --provider <provider> <criteria>` to search models
+- **FR-011**: Add `modelforge models info --provider <provider> --model <model>` for model details
+- **FR-012**: Provide interactive model selection with models.dev metadata
+- **FR-013**: Show model details (pricing, context window, capabilities) from models.dev
+- **FR-014**: Enable filtering by provider, capabilities, or pricing
 
 ### Configuration Enhancement
-- **FR-011**: Auto-populate provider configurations from models.dev templates
-- **FR-012**: Validate user configurations against models.dev schema
-- **FR-013**: Suggest optimal models based on use case and models.dev data
-- **FR-14**: Provide warnings for deprecated or discontinued models
-- **FR-15**: Support custom model definitions alongside models.dev inventory
+- **FR-015**: Auto-populate provider configurations from models.dev templates
+- **FR-016**: Validate user configurations against models.dev schema
+- **FR-017**: Suggest optimal models based on use case and models.dev data
+- **FR-018**: Provide warnings for deprecated or discontinued models
+- **FR-019**: Support custom model definitions alongside models.dev inventory
 
 ### Data Management
 - **FR-16**: Implement efficient caching with configurable TTL

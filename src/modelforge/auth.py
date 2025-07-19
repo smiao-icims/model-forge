@@ -2,6 +2,7 @@
 
 import getpass
 import time
+import webbrowser
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -88,6 +89,12 @@ class ApiKeyAuth(AuthStrategy):
         logger.warning("No API key provided for %s", self.provider_name)
         return None
 
+    def store_api_key(self, api_key: str) -> None:
+        """Store API key for the provider without prompting."""
+        auth_data = {"api_key": api_key}
+        self._save_auth_data(auth_data)
+        logger.info("API key stored for %s", self.provider_name)
+
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored API key from config."""
         try:
@@ -162,6 +169,13 @@ class DeviceFlowAuth(AuthStrategy):
         )
         print(f"And enter this code: {device_code_data['user_code']}")
         print("Waiting for authentication...")
+
+        # Try to open browser automatically
+        try:
+            webbrowser.open(device_code_data["verification_uri"])
+            print("Browser opened automatically. If not, use the URL above.")
+        except Exception:
+            print("Please open the URL manually in your browser.")
 
         # Step 3: Poll for token
         return self._poll_for_token(device_code_data)
@@ -284,7 +298,7 @@ class DeviceFlowAuth(AuthStrategy):
                     "Successfully obtained access token for %s", self.provider_name
                 )
                 self._save_token_info(token_data)
-                return token_data
+                return dict(token_data)
 
     def _save_token_info(self, token_data: dict[str, Any]) -> None:
         """Save token information to config file."""
@@ -363,7 +377,7 @@ class DeviceFlowAuth(AuthStrategy):
 
             self._save_token_info(new_token_data)
             logger.info("Successfully refreshed token for %s", self.provider_name)
-            return new_token_data
+            return dict(new_token_data)
 
     def get_token_info(self) -> dict[str, Any] | None:
         """Retrieve token information from config file."""
