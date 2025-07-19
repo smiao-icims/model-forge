@@ -88,14 +88,31 @@ poetry run modelforge test --prompt "Hello world"
 - **src/modelforge/auth.py**: Authentication strategies and credential management
 - **src/modelforge/cli.py**: Click-based CLI for configuration management
 
-## Distribution Packaging Learnings
+## PyPI Distribution & Version Management (✅ Completed)
 
-### Key Challenges Resolved
-1. **Poetry vs pip**: CI uses pip install -e .[dev] to avoid Poetry dependency issues
-2. **Type checking**: MyPy configured with practical settings (--ignore-missing-imports)
-3. **Linter rules**: Ruff configured with appropriate ignore rules for CLI complexity
-4. **Test parameter mismatch**: Fixed unit test expecting `model_name` vs actual `model` parameter
-5. **CI/CD workflow**: Split into test/lint/security jobs for better error isolation
+### PyPI Publishing Process
+- **Package name**: `model-forge-llm` (avoided conflict with 2018 `modelforge` package)
+- **Version policy**: PyPI versions are **immutable** - once published, cannot be modified
+- **Release workflow**: Automatic via GitHub Actions on tag push
+- **Version management**: Must increment for each release (patch/minor/major)
+
+### PyPI Publishing Workflow
+```bash
+# Development flow
+poetry version patch        # Bump version (0.2.0 → 0.2.1)
+git tag v0.2.1              # Create new tag
+git push origin v0.2.1      # Triggers release workflow
+
+# Manual fallback (if needed)
+poetry build
+poetry publish              # Requires PyPI API token
+```
+
+### Key Learnings
+1. **Version immutability**: PyPI doesn't allow re-uploading same version
+2. **Tag-based releases**: GitHub Actions triggers on `v*` tags, not branch commits
+3. **Multi-platform testing**: Tests run on Ubuntu, macOS, Windows with Python 3.11/3.12
+4. **Build caching**: CI builds use cached dependencies for faster releases
 
 ### Build System Evolution
 - **From**: Poetry-only with complex CI setup
