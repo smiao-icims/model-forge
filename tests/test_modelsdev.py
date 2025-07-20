@@ -90,20 +90,22 @@ class TestModelsDevClient:
             "openai": {
                 "models": {
                     "gpt-4": {
-                        "display_name": "GPT-4",
-                        "description": "GPT-4 model",
-                        "capabilities": ["chat"],
-                        "context_length": 8192,
-                        "max_tokens": 4096,
-                        "pricing": {"input": 0.03, "output": 0.06},
+                        "name": "GPT-4",
+                        "attachment": True,
+                        "reasoning": False,
+                        "tool_call": True,
+                        "cost": {"input": 0.03, "output": 0.06},
+                        "limit": {"context": 8192, "output": 4096},
+                        "modalities": {"input": ["text", "image"], "output": ["text"]},
                     },
                     "gpt-3.5-turbo": {
-                        "display_name": "GPT-3.5 Turbo",
-                        "description": "GPT-3.5 Turbo model",
-                        "capabilities": ["chat"],
-                        "context_length": 4096,
-                        "max_tokens": 4096,
-                        "pricing": {"input": 0.0015, "output": 0.002},
+                        "name": "GPT-3.5 Turbo",
+                        "attachment": False,
+                        "reasoning": False,
+                        "tool_call": True,
+                        "cost": {"input": 0.0015, "output": 0.002},
+                        "limit": {"context": 4096, "output": 4096},
+                        "modalities": {"input": ["text"], "output": ["text"]},
                     },
                 }
             }
@@ -117,6 +119,13 @@ class TestModelsDevClient:
         assert models[0]["id"] == "gpt-4"
         assert models[0]["provider"] == "openai"
         assert models[0]["display_name"] == "GPT-4"
+        # Check that description is now populated with meaningful content
+        assert models[0]["description"] != ""
+        assert "model" in models[0]["description"].lower()
+        # Check that capabilities are extracted
+        assert isinstance(models[0]["capabilities"], list)
+        # Check that pricing is extracted
+        assert models[0]["pricing"]["input_per_1k_tokens"] == 0.03
 
     def test_get_models_with_provider_filter(self, requests_mock: Mocker) -> None:
         """Test models retrieval with provider filter."""
@@ -160,20 +169,26 @@ class TestModelsDevClient:
             "openai": {
                 "models": {
                     "gpt-4": {
-                        "display_name": "GPT-4",
-                        "description": "Advanced language model",
-                        "capabilities": ["chat", "code"],
-                        "pricing": {"input": 0.03},
+                        "name": "GPT-4",
+                        "attachment": True,
+                        "reasoning": False,
+                        "tool_call": True,
+                        "cost": {"input": 0.03},
+                        "limit": {"context": 8192, "output": 4096},
+                        "modalities": {"input": ["text", "image"], "output": ["text"]},
                     }
                 }
             },
             "anthropic": {
                 "models": {
                     "claude-3": {
-                        "display_name": "Claude 3",
-                        "description": "Claude model",
-                        "capabilities": ["chat"],
-                        "pricing": {"input": 0.08},
+                        "name": "Claude 3",
+                        "attachment": True,
+                        "reasoning": False,
+                        "tool_call": True,
+                        "cost": {"input": 0.08},
+                        "limit": {"context": 200000, "output": 4096},
+                        "modalities": {"input": ["text", "image"], "output": ["text"]},
                     }
                 }
             },
@@ -195,9 +210,9 @@ class TestModelsDevClient:
 
                 # Test capability filter
                 results = client.search_models(
-                    "", capabilities=["code"], force_refresh=True
+                    "", capabilities=["function_calling"], force_refresh=True
                 )
-                assert len(results) == 1
+                assert len(results) == 2  # Both models have function_calling capability
                 assert results[0]["id"] == "gpt-4"
 
                 # Test price filter - note: pricing structure changed

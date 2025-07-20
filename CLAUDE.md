@@ -298,6 +298,337 @@ echo "$(find specs -name "tasks.md" | wc -l) total specs"
 - **Measurable**: Clear success criteria
 - **Achievable**: Realistic scope
 - **Relevant**: Aligns with project goals
+
+## Bug Fix Workflow 🐛
+
+### **Structured Bug Fix Process**
+
+We follow a **Specification-Driven Bug Fix** approach that mirrors our feature development workflow:
+
+1. **Investigation & Analysis**: Understand the root cause
+2. **Spec Creation**: Document the problem, solution design, and implementation tasks
+3. **Test-Driven Fix**: Write tests that demonstrate the fix
+4. **Implementation**: Code the solution following the spec
+5. **Validation**: Ensure fix works and doesn't break existing functionality
+
+### **Bug Fix Directory Structure**
+```
+specs/bug-fixes/
+├── issue-name/
+│   ├── requirements.md    # Problem analysis & requirements
+│   ├── design.md         # Technical solution design
+│   └── tasks.md          # Implementation tasks
+```
+
+### **Step-by-Step Bug Fix Workflow**
+
+#### **Phase 1: Investigation (15-30 minutes)**
+
+```bash
+# 1. Reproduce the issue
+poetry run modelforge [command that fails]
+
+# 2. Investigate with verbose logging
+poetry run modelforge [command] --verbose
+
+# 3. Check relevant test files
+poetry run pytest tests/test_[relevant_module].py -v
+
+# 4. Examine the codebase
+# Look at the relevant source files to understand current implementation
+```
+
+#### **Phase 2: Spec Creation (30-45 minutes)**
+
+```bash
+# 1. Create bug fix spec directory
+mkdir -p specs/bug-fixes/[issue-name]/
+
+# 2. Create requirements.md
+# Document:
+# - Problem statement with examples
+# - Root cause analysis
+# - Expected vs actual behavior
+# - Success criteria
+```
+
+**requirements.md Template:**
+```markdown
+# Bug Fix: [Issue Title] - Requirements
+
+## Problem Statement
+[Clear description of the issue]
+
+## Root Cause Analysis
+[Technical explanation of why the bug occurs]
+
+## Requirements
+- **REQ-001**: [Specific requirement to fix the issue]
+- **REQ-002**: [Additional requirements]
+
+## Expected Behavior
+[What should happen]
+
+## Actual Behavior
+[What currently happens]
+
+## Success Criteria
+- [ ] Issue is resolved
+- [ ] No regressions introduced
+- [ ] Tests pass
+```
+
+```bash
+# 3. Create design.md
+# Document:
+# - Technical solution approach
+# - Code changes needed
+# - Testing strategy
+# - Backward compatibility considerations
+```
+
+**design.md Template:**
+```markdown
+# Bug Fix: [Issue Title] - Design
+
+## Technical Analysis
+[Analysis of the current implementation and issues]
+
+## Solution Design
+[How you plan to fix the issue]
+
+## Implementation Strategy
+[Step-by-step approach]
+
+## Testing Strategy
+[How you'll test the fix]
+
+## Backward Compatibility
+[Ensuring no breaking changes]
+```
+
+```bash
+# 4. Create tasks.md
+# Document:
+# - Specific implementation tasks
+# - Testing tasks
+# - Validation tasks
+```
+
+**tasks.md Template:**
+```markdown
+# Bug Fix: [Issue Title] - Tasks
+
+## Implementation Tasks
+- [ ] **TASK-001**: [Specific code change]
+- [ ] **TASK-002**: [Additional changes]
+
+## Testing Tasks
+- [ ] **TASK-003**: [Write/update tests]
+- [ ] **TASK-004**: [Integration testing]
+
+## Validation Tasks
+- [ ] **TASK-005**: [Manual testing]
+- [ ] **TASK-006**: [Regression testing]
+```
+
+#### **Phase 3: Test-Driven Fix (30-60 minutes)**
+
+```bash
+# 1. Write failing tests that demonstrate the bug
+touch tests/test_[bug_fix_name].py
+
+# 2. Write tests that will pass when bug is fixed
+poetry run pytest tests/test_[bug_fix_name].py -v
+# (These should fail initially)
+
+# 3. Update existing tests if needed
+# Ensure existing tests still reflect correct behavior
+```
+
+**Test Structure Example:**
+```python
+def test_bug_fix_specific_scenario():
+    """Test that demonstrates the bug is fixed."""
+    # Given: Setup that reproduces the bug
+    # When: Action that previously failed
+    # Then: Expected correct behavior
+
+def test_bug_fix_no_regression():
+    """Test that existing functionality still works."""
+    # Ensure the fix doesn't break other features
+```
+
+#### **Phase 4: Implementation (60-120 minutes)**
+
+```bash
+# 1. Implement the fix following the design spec
+# Make minimal changes to fix the specific issue
+
+# 2. Run tests frequently during development
+poetry run pytest tests/test_[bug_fix_name].py -v
+
+# 3. Update task completion in tasks.md
+# Mark tasks as completed: [x] **TASK-001**: Description (✅ completed)
+```
+
+#### **Phase 5: Validation (15-30 minutes)**
+
+```bash
+# 1. Run full test suite
+poetry run pytest --cov=src/modelforge
+
+# 2. Run code quality checks
+poetry run ruff format .
+poetry run ruff check .
+poetry run mypy src/modelforge --ignore-missing-imports
+
+# 3. Manual testing
+poetry run modelforge [original failing command]
+
+# 4. Test edge cases and related functionality
+```
+
+### **Bug Fix Validation Checklist**
+
+#### **Technical Validation**
+- [ ] Original issue is resolved
+- [ ] All tests pass (including new tests)
+- [ ] Code quality checks pass (ruff, mypy)
+- [ ] No performance degradation
+- [ ] Backward compatibility maintained
+
+#### **User Experience Validation**
+- [ ] CLI commands work as expected
+- [ ] Error messages are helpful
+- [ ] No new confusing behavior introduced
+- [ ] Documentation updated if needed
+
+#### **Regression Testing**
+- [ ] Related functionality still works
+- [ ] Integration tests pass
+- [ ] Manual testing of similar features
+- [ ] Edge cases handled properly
+
+### **Bug Fix Example: models-list-empty-descriptions**
+
+**Problem**: `modelforge models list` appeared to show hardcoded data due to empty descriptions.
+
+**Root Cause**: `_parse_model_data()` method wasn't extracting description information from API response.
+
+**Solution**: Enhanced description generation from model metadata.
+
+**Files Changed**:
+- `src/modelforge/modelsdev.py`: Added description generation logic
+- `tests/test_modelsdev_descriptions.py`: Comprehensive test suite
+- Updated existing tests to match new data structure
+
+**Result**: Rich, informative model descriptions showing live API data.
+
+### **Bug Fix Commands Reference**
+
+#### **Investigation**
+```bash
+# Reproduce issue
+poetry run modelforge [failing-command]
+
+# Debug with verbose output
+poetry run modelforge [failing-command] --verbose
+
+# Run related tests
+poetry run pytest tests/test_[module].py -v
+```
+
+#### **Development**
+```bash
+# Create spec directory
+mkdir -p specs/bug-fixes/[issue-name]/
+
+# Run specific tests during development
+poetry run pytest tests/test_[bug_fix].py -v
+
+# Check code quality
+poetry run ruff format . && poetry run ruff check .
+```
+
+#### **Validation**
+```bash
+# Full test suite
+poetry run pytest --cov=src/modelforge
+
+# Manual verification
+poetry run modelforge [original-command]
+
+# Performance check (if relevant)
+time poetry run modelforge [command]
+```
+
+### **Bug Fix Best Practices**
+
+#### **Investigation**
+- **Reproduce consistently**: Ensure you can reliably reproduce the issue
+- **Understand root cause**: Don't just fix symptoms, understand why it happens
+- **Check related code**: Look for similar patterns that might have the same issue
+- **Review recent changes**: Check if recent commits introduced the bug
+
+#### **Specification**
+- **Be specific**: Clearly define what needs to be fixed
+- **Consider edge cases**: Think about boundary conditions and error scenarios
+- **Plan for testing**: Design the fix with testability in mind
+- **Document assumptions**: Note any assumptions about the current system
+
+#### **Implementation**
+- **Minimal changes**: Fix the specific issue without unnecessary refactoring
+- **Test-driven**: Write tests first, then implement the fix
+- **Incremental progress**: Make small, verifiable changes
+- **Update documentation**: Keep specs updated as you implement
+
+#### **Validation**
+- **Comprehensive testing**: Test the fix, regressions, and edge cases
+- **User perspective**: Verify the fix from a user's point of view
+- **Performance impact**: Ensure the fix doesn't degrade performance
+- **Long-term maintainability**: Consider how the fix affects future development
+
+### **Common Bug Fix Patterns**
+
+#### **Data Parsing Issues**
+- **Problem**: API response structure doesn't match expected format
+- **Solution**: Update parsing logic to handle actual API structure
+- **Testing**: Mock API responses with real data structure
+
+#### **Empty/Missing Data Display**
+- **Problem**: UI shows empty or placeholder data
+- **Solution**: Improve data extraction and fallback logic
+- **Testing**: Test with various data completeness scenarios
+
+#### **Configuration Issues**
+- **Problem**: Settings not loading or applying correctly
+- **Solution**: Fix configuration precedence and validation
+- **Testing**: Test different configuration scenarios
+
+#### **CLI Command Issues**
+- **Problem**: Commands fail or produce unexpected output
+- **Solution**: Fix argument parsing and output formatting
+- **Testing**: Test CLI commands with various input combinations
+
+### **Bug Fix Documentation**
+
+After completing a bug fix, update:
+
+1. **CLAUDE.md**: Add new patterns or commands if applicable
+2. **README.md**: Update if user-facing behavior changed
+3. **Spec completion**: Mark all tasks as completed in tasks.md
+4. **Code comments**: Reference the bug fix in relevant code sections
+
+### **Emergency Bug Fix Process**
+
+For critical production issues:
+
+1. **Immediate fix**: Create minimal fix without full spec process
+2. **Deploy hotfix**: Get the fix to users quickly
+3. **Follow-up spec**: Create proper spec documentation after the fact
+4. **Comprehensive testing**: Add tests to prevent regression
+5. **Root cause analysis**: Understand why the bug wasn't caught earlier
 - **Time-bound**: Includes effort estimation
 
 #### **Test Writing**

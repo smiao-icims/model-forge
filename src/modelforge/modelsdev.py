@@ -187,19 +187,91 @@ class ModelsDevClient:
                 if provider_filter and provider_key != provider_filter:
                     continue
 
+                # Generate rich description from metadata
+                description = self._generate_model_description(model_info)
+
                 # Normalize model data
                 normalized_model = {
                     "id": model_key,
                     "provider": provider_key,
-                    "display_name": model_info.get("display_name", model_key),
-                    "description": model_info.get("description", ""),
-                    "capabilities": model_info.get("capabilities", []),
-                    "context_length": model_info.get("context_length"),
-                    "max_tokens": model_info.get("max_tokens"),
-                    "pricing": model_info.get("pricing"),
+                    "display_name": model_info.get("name", model_key),
+                    "description": description,
+                    "capabilities": self._extract_capabilities(model_info),
+                    "context_length": model_info.get("limit", {}).get("context"),
+                    "max_tokens": model_info.get("limit", {}).get("output"),
+                    "pricing": self._extract_pricing(model_info),
                 }
                 models.append(normalized_model)
         return models
+
+    def _generate_model_description(self, model_info: dict[str, Any]) -> str:
+        """Generate a descriptive string from model metadata."""
+        try:
+            parts = []
+
+            # Add model type/capabilities
+            if model_info.get("reasoning"):
+                parts.append("Reasoning model")
+            elif model_info.get("attachment"):
+                parts.append("Multimodal model")
+            else:
+                parts.append("Text model")
+
+            # Add pricing info
+            cost = model_info.get("cost", {})
+            if cost.get("input"):
+                parts.append(f"${cost['input']}/1K input")
+
+            # Add context length
+            limit = model_info.get("limit", {})
+            if limit.get("context"):
+                context_k = limit["context"] // 1000
+                parts.append(f"{context_k}K context")
+
+            description = ", ".join(parts)
+
+            # Fallback to model name if no meaningful description generated
+            return str(
+                model_info.get("name", "Language model")
+                if not description or description == "Text model"
+                else description
+            )
+
+        except Exception as e:
+            logger.warning("Failed to generate model description: %s", e)
+            return str(model_info.get("name", "Language model"))
+
+    def _extract_capabilities(self, model_info: dict[str, Any]) -> list[str]:
+        """Extract model capabilities from API response."""
+        capabilities = []
+
+        if model_info.get("reasoning"):
+            capabilities.append("reasoning")
+        if model_info.get("tool_call"):
+            capabilities.append("function_calling")
+        if model_info.get("attachment"):
+            capabilities.append("multimodal")
+
+        modalities = model_info.get("modalities", {})
+        input_types = modalities.get("input", [])
+        if "image" in input_types:
+            capabilities.append("vision")
+        if "audio" in input_types:
+            capabilities.append("audio")
+        if "video" in input_types:
+            capabilities.append("video")
+
+        return capabilities
+
+    def _extract_pricing(self, model_info: dict[str, Any]) -> dict[str, Any]:
+        """Extract pricing information from API response."""
+        cost = model_info.get("cost", {})
+        return {
+            "input_per_1k_tokens": cost.get("input"),
+            "output_per_1k_tokens": cost.get("output"),
+            "cache_read_per_1k_tokens": cost.get("cache_read"),
+            "cache_write_per_1k_tokens": cost.get("cache_write"),
+        }
 
     def _fetch_models(
         self, cache_path: Path, provider: str | None = None, force_refresh: bool = False
