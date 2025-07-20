@@ -129,6 +129,189 @@ poetry run modelforge test --prompt "Hello world"
 - **src/modelforge/config.py**: Configuration loading/saving with global/local precedence
 - **src/modelforge/auth.py**: Authentication strategies and credential management
 - **src/modelforge/cli.py**: Click-based CLI for configuration management
+- **src/modelforge/modelsdev.py**: models.dev API integration with caching
+
+## Spec-Driven TDD Development 🎯
+
+### **Development Philosophy**
+We follow **Specification-Driven Test-Driven Development (TDD)** where:
+1. **Specs first**: Write requirements, design, and tasks in `specs/` directory
+2. **Tests second**: Write failing tests based on spec requirements
+3. **Code third**: Implement code to make tests pass
+4. **Refactor fourth**: Improve code while keeping tests green
+
+### **Spec Directory Structure**
+```
+specs/
+├── baseline/                    # Core architecture specs
+├── enhancements/               # Feature additions
+│   ├── distribution-packaging/ # PyPI packaging (✅ COMPLETED)
+│   ├── modelsdev-integration/  # models.dev API (✅ COMPLETED)
+│   ├── uv-migration/          # UV package manager
+│   └── error-handling-improvements/
+├── security-credentials-refactor/
+├── testing-improvements/
+└── type-safety-refactor/
+```
+
+### **Spec-Driven TDD Workflow**
+
+#### **1. Planning Phase**
+```bash
+# Create new feature spec
+cp -r specs/template specs/features/your-feature-name/
+
+# Edit the three required files:
+# - specs/features/your-feature-name/requirements.md
+# - specs/features/your-feature-name/design.md
+# - specs/features/your-feature-name/tasks.md
+```
+
+#### **2. Test-Driven Development**
+```bash
+# 1. Write failing tests based on spec tasks
+touch tests/test_your_feature.py
+
+# 2. Run tests (they should fail)
+poetry run pytest tests/test_your_feature.py -v
+
+# 3. Implement minimal code to pass tests
+# 4. Refactor while keeping tests green
+# 5. Update spec task completion status
+```
+
+#### **3. Spec Validation Checklist**
+- [ ] **Requirements**: Clear problem statement and acceptance criteria
+- [ ] **Design**: Architecture decisions and technical approach
+- [ ] **Tasks**: Specific, testable implementation tasks
+- [ ] **Tests**: Each task has corresponding test cases
+- [ ] **Documentation**: User-facing documentation updated
+
+### **Spec Template Usage**
+
+#### **For New Features**
+```bash
+# 1. Create new spec directory
+mkdir -p specs/features/new-authentication-method
+
+# 2. Copy template
+cp specs/template/* specs/features/new-authentication-method/
+
+# 3. Edit files with your feature details
+#    - requirements.md: What problem are we solving?
+#    - design.md: How will we solve it?
+#    - tasks.md: Specific steps to implement
+```
+
+#### **Spec Task Completion Format**
+When completing tasks, use this format:
+```markdown
+- [x] **TASK-001**: Create authentication class (✅ AuthProvider implemented)
+- [x] **TASK-002**: Add OAuth2 flow (✅ OAuth2DeviceFlow class created)
+- [ ] **TASK-003**: Implement token refresh (⏳ pending - see tests/test_auth.py)
+```
+
+### **Testing Requirements per Spec**
+
+#### **Minimum Test Coverage**
+- **Unit tests**: 90%+ coverage for new features
+- **Integration tests**: API endpoints and CLI commands
+- **Mock tests**: External dependencies (APIs, file system)
+- **Performance tests**: Cache hit rates and API timing
+
+#### **Test Structure**
+```python
+def test_spec_task_001_basic_functionality():
+    """Test TASK-001: Basic functionality requirement"""
+    # Given: Setup from spec
+    # When: Action from spec
+    # Then: Expected result from spec
+```
+
+### **Spec Review Process**
+
+#### **Before Implementation**
+1. **Peer review**: Spec must be reviewed before coding
+2. **Test review**: Test cases must be reviewed before implementation
+3. **Design validation**: Architecture decisions validated against requirements
+
+#### **During Implementation**
+1. **Daily spec sync**: Update task completion status
+2. **Test running**: All tests must pass before moving to next task
+3. **Documentation**: Update CLAUDE.md with new patterns
+
+#### **Completion Criteria**
+- All spec tasks marked ✅ completed
+- All tests passing
+- Documentation updated
+- Code review approved
+- Spec merged to main branch
+
+### **Current Active Specs**
+
+#### **✅ COMPLETED**
+- **distribution-packaging**: PyPI distribution (v0.2.4 released)
+- **modelsdev-integration**: models.dev API integration
+
+#### **🔄 IN PROGRESS**
+- **error-handling-improvements**: Comprehensive error handling (requirements.md ready)
+
+#### **📋 BACKLOG**
+- **uv-migration**: Switch to UV package manager
+- **security-credentials-refactor**: Enhanced security
+- **testing-improvements**: Test suite enhancements
+- **type-safety-refactor**: Enhanced type checking
+
+### **Spec Development Commands**
+
+#### **Spec Creation**
+```bash
+# New feature spec
+cp -r specs/template specs/features/my-new-feature
+
+# Edit the three core files
+vim specs/features/my-new-feature/requirements.md  # What
+vim specs/features/my-new-feature/design.md        # How
+vim specs/features/my-new-feature/tasks.md         # Steps
+```
+
+#### **Spec Validation**
+```bash
+# Validate spec completeness
+./scripts/validate-spec.sh specs/features/my-new-feature/
+
+# Generate test stubs from spec
+./scripts/generate-tests.sh specs/features/my-new-feature/
+```
+
+#### **Spec Status**
+```bash
+# Check spec completion status
+find specs -name "tasks.md" -exec grep -l "\[x\]" {} \; | wc -l
+echo "$(find specs -name "tasks.md" | wc -l) total specs"
+```
+
+### **Best Practices**
+
+#### **Spec Writing**
+- **Specific**: Each task should be testable
+- **Measurable**: Clear success criteria
+- **Achievable**: Realistic scope
+- **Relevant**: Aligns with project goals
+- **Time-bound**: Includes effort estimation
+
+#### **Test Writing**
+- **One test per task**: Direct mapping to spec tasks
+- **Descriptive names**: Include task number and purpose
+- **Arrange-Act-Assert**: Clear test structure
+- **Mock external deps**: Use pytest-mock for APIs
+- **Parametrize**: Test multiple scenarios
+
+#### **Documentation**
+- **Update CLAUDE.md**: Add new patterns and commands
+- **Code comments**: Reference spec task numbers
+- **README updates**: Document new features
+- **Changelog**: Track spec-driven changes
 
 ## PyPI Distribution & Version Management (✅ Completed)
 
