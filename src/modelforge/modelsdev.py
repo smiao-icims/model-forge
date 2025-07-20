@@ -81,6 +81,38 @@ class ModelsDevClient:
         except OSError as e:
             logger.warning("Failed to write cache file %s: %s", cache_path, e)
 
+    def _raise_content_type_error(self, content_type: str) -> None:
+        """Raise error for invalid content type."""
+        raise ValueError(f"Expected JSON response, got {content_type}")
+
+    def _raise_provider_not_found_error(self, provider: str) -> None:
+        """Raise error when provider is not found."""
+        raise ValueError(f"Provider '{provider}' not found in models.dev API")
+
+    def _raise_invalid_provider_structure_error(self, provider: str) -> None:
+        """Raise error for invalid provider data structure."""
+        raise ValueError(f"Invalid provider data structure for '{provider}'")
+
+    def _raise_model_not_found_error(self, model: str, provider: str) -> None:
+        """Raise error when model is not found for provider."""
+        raise ValueError(f"Model '{model}' not found for provider '{provider}'")
+
+    def _raise_enhanced_provider_error(
+        self, original_error: ValueError, suggestions: str
+    ) -> None:
+        """Raise enhanced error with provider suggestions."""
+        raise ValueError(
+            f"{original_error}. Available providers include: {suggestions}"
+        ) from original_error
+
+    def _raise_enhanced_model_error(
+        self, original_error: ValueError, suggestions: str
+    ) -> None:
+        """Raise enhanced error with model suggestions."""
+        raise ValueError(
+            f"{original_error}. Available models include: {suggestions}"
+        ) from original_error
+
     def _parse_provider_data(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         """Parse provider data from models.dev API response."""
         providers = []
@@ -324,12 +356,10 @@ class ModelsDevClient:
         cache_path = self._get_cache_path("models", provider or "all")
         return self._fetch_models(cache_path, provider, force_refresh)
 
-    def _fetch_model_info(
+    def _fetch_model_info(  # noqa: PLR0912
         self, cache_path: Path, provider: str, model: str, force_refresh: bool = False
     ) -> dict[str, Any]:
-        """Fetch model info from API or cache."""
-        model_info: dict[str, Any] = {}
-
+        """Fetch model info from models.dev API."""
         if not force_refresh and self._is_cache_valid(
             cache_path, self.CACHE_TTL["model_info"]
         ):
@@ -337,30 +367,70 @@ class ModelsDevClient:
             if cached_data and isinstance(cached_data, dict):
                 return cached_data
 
-        try:
-            url = f"{self.BASE_URL}/models/{provider}/{model}"
-            response = self.session.get(url)
-            response.raise_for_status()
-            api_response = response.json()
-            if isinstance(api_response, dict):
-                model_info = api_response
-            else:
-                model_info = {"model": api_response}
+        # Normalize provider name (replace underscores with hyphens)
+        normalized_provider = provider.replace("_", "-")
 
+        # Use the main API endpoint
+        url = f"{self.BASE_URL}/api.json"
+        model_info: dict[str, Any] = {}
+
+        try:
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()  # Raise exception for 4XX/5XX status codes
+
+            # Check if response is JSON
+            content_type = response.headers.get("Content-Type", "")
+            if "application/json" not in content_type.lower():
+                self._raise_content_type_error(content_type)
+
+            api_response = response.json()
+
+            # Extract the specific model data
+            if normalized_provider not in api_response:
+                self._raise_provider_not_found_error(provider)
+
+            provider_data = api_response[normalized_provider]
+            if "models" not in provider_data or not isinstance(
+                provider_data["models"], dict
+            ):
+                self._raise_invalid_provider_structure_error(provider)
+
+            models = provider_data["models"]
+            if model not in models:
+                self._raise_model_not_found_error(model, provider)
+
+            model_info = models[model]
+
+            # Add provider and id fields if not present
+            model_info["provider"] = normalized_provider
+            model_info["id"] = model
+
+            # Cache the response
             self._save_to_cache(cache_path, model_info)
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-            logger.exception("Connection error while fetching model info")
+        except requests.RequestException as e:
+            logger.exception("Failed to fetch model info")
+            # Try to use cached data as fallback
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached model info")
                 return cached_data
-            raise
-        except requests.exceptions.HTTPError:
-            logger.exception("HTTP error while fetching model info")
+            raise ValueError(f"Failed to fetch model info: {e}") from e
+        except json.JSONDecodeError as e:
+            logger.exception("Failed to parse model info")
+            # Try to use cached data as fallback
             cached_data = self._load_from_cache(cache_path)
             if cached_data and isinstance(cached_data, dict):
                 logger.info("Using stale cached model info")
                 return cached_data
+            raise ValueError(f"Failed to parse model info: {e}") from e
+        except ValueError:
+            logger.exception("Failed to parse model info")
+            # Try to use cached data as fallback
+            cached_data = self._load_from_cache(cache_path)
+            if cached_data and isinstance(cached_data, dict):
+                logger.info("Using stale cached model info")
+                return cached_data
+            # Re-raise the original ValueError without wrapping it
             raise
 
         return model_info
@@ -369,8 +439,51 @@ class ModelsDevClient:
         self, provider: str, model: str, force_refresh: bool = False
     ) -> dict[str, Any]:
         """Get detailed information about a specific model."""
-        cache_path = self._get_cache_path("model_info", provider, model)
-        return self._fetch_model_info(cache_path, provider, model, force_refresh)
+        # Validate provider and model
+        if not provider:
+            raise ValueError("Provider name is required")
+        if not model:
+            raise ValueError("Model name is required")
+
+        # Normalize provider name for cache path consistency
+        normalized_provider = provider.replace("_", "-")
+        cache_path = self._get_cache_path("model_info", normalized_provider, model)
+
+        try:
+            return self._fetch_model_info(cache_path, provider, model, force_refresh)
+        except ValueError as e:
+            # Provide helpful suggestions for common errors
+            if "Provider" in str(e) and "not found" in str(e):
+                try:
+                    providers = self.get_providers(force_refresh=False)
+                    provider_names = [p.get("name", "") for p in providers[:5]]
+                    suggestions = ", ".join(filter(None, provider_names))
+                    if suggestions:
+                        self._raise_enhanced_provider_error(e, suggestions)
+                except ValueError:
+                    # Re-raise ValueError (including our enhanced one)
+                    raise
+                except Exception:  # noqa: S110
+                    # Only catch non-ValueError exceptions from get_providers()
+                    # Intentionally ignore these to fall through to original error
+                    pass
+            elif "Model" in str(e) and "not found" in str(e):
+                try:
+                    models = self.get_models(
+                        provider=normalized_provider, force_refresh=False
+                    )
+                    model_ids = [m.get("id", "") for m in models[:5]]
+                    suggestions = ", ".join(filter(None, model_ids))
+                    if suggestions:
+                        self._raise_enhanced_model_error(e, suggestions)
+                except ValueError:
+                    # Re-raise ValueError (including our enhanced one)
+                    raise
+                except Exception:  # noqa: S110
+                    # Only catch non-ValueError exceptions from get_models()
+                    # Intentionally ignore these to fall through to original error
+                    pass
+            raise
 
     def _fetch_provider_config(
         self, cache_path: Path, provider: str, force_refresh: bool = False

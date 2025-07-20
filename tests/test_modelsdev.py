@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from requests_mock import Mocker
 
 from modelforge.modelsdev import ModelsDevClient
@@ -151,17 +152,38 @@ class TestModelsDevClient:
 
     def test_get_model_info_success(self, requests_mock: Mocker) -> None:
         """Test successful model info retrieval."""
-        mock_info = {
-            "name": "gpt-4",
-            "provider": "openai",
-            "description": "GPT-4 model",
+        # Mock the full API response structure
+        mock_api_response = {
+            "openai": {
+                "models": {
+                    "gpt-4": {
+                        "name": "gpt-4",
+                        "description": "GPT-4 model",
+                        "attachment": True,
+                        "reasoning": False,
+                    }
+                }
+            }
         }
-        requests_mock.get("https://models.dev/models/openai/gpt-4", json=mock_info)
+        requests_mock.get(
+            "https://models.dev/api.json",
+            json=mock_api_response,
+            headers={"Content-Type": "application/json"},
+        )
 
         client = ModelsDevClient()
         info = client.get_model_info("openai", "gpt-4")
 
-        assert info == mock_info
+        # The returned info should include the model data plus provider and id fields
+        expected_info = {
+            "name": "gpt-4",
+            "description": "GPT-4 model",
+            "attachment": True,
+            "reasoning": False,
+            "provider": "openai",
+            "id": "gpt-4",
+        }
+        assert info == expected_info
 
     def test_search_models(self, requests_mock: Mocker) -> None:
         """Test model search functionality."""
@@ -271,3 +293,123 @@ class TestModelsDevClient:
             with patch("pathlib.Path.home", return_value=Path(temp_dir)):
                 client = ModelsDevClient()
                 assert not client._is_cache_valid(cache_file, 3600)
+
+    def test_get_model_info_provider_not_found(self, requests_mock: Mocker) -> None:
+        """Test error handling when provider is not found."""
+        # Mock API response without the requested provider
+        mock_api_response = {
+            "openai": {"models": {"gpt-4": {"name": "GPT-4"}}},
+            "anthropic": {"models": {"claude-3": {"name": "Claude 3"}}},
+        }
+        requests_mock.get(
+            "https://models.dev/api.json",
+            json=mock_api_response,
+            headers={"Content-Type": "application/json"},
+        )
+
+        # Mock get_providers for suggestions
+        requests_mock.get(
+            "https://models.dev/api.json",
+            json=mock_api_response,
+            headers={"Content-Type": "application/json"},
+        )
+
+        client = ModelsDevClient()
+
+        with pytest.raises(ValueError, match="Provider.*not found") as exc_info:
+            client.get_model_info("nonexistent", "gpt-4", force_refresh=True)
+
+        error_msg = str(exc_info.value)
+        assert "Provider 'nonexistent' not found" in error_msg
+        assert "Available providers include:" in error_msg
+
+    def test_get_model_info_model_not_found(self, requests_mock: Mocker) -> None:
+        """Test error handling when model is not found for provider."""
+        # Mock API response with provider but without the requested model
+        mock_api_response = {
+            "openai": {
+                "models": {
+                    "gpt-4": {"name": "GPT-4"},
+                    "gpt-3.5-turbo": {"name": "GPT-3.5 Turbo"},
+                }
+            }
+        }
+        requests_mock.get(
+            "https://models.dev/api.json",
+            json=mock_api_response,
+            headers={"Content-Type": "application/json"},
+        )
+
+        client = ModelsDevClient()
+
+        with pytest.raises(ValueError, match="Model.*not found") as exc_info:
+            client.get_model_info("openai", "nonexistent", force_refresh=True)
+
+        error_msg = str(exc_info.value)
+        assert "Model 'nonexistent' not found for provider 'openai'" in error_msg
+        assert "Available models include:" in error_msg
+
+    def test_get_model_info_provider_normalization(self, requests_mock: Mocker) -> None:
+        """Test provider name normalization (underscores to hyphens)."""
+        mock_api_response = {
+            "github-copilot": {
+                "models": {
+                    "gpt-4o": {
+                        "name": "GPT-4o",
+                        "attachment": True,
+                    }
+                }
+            }
+        }
+        requests_mock.get(
+            "https://models.dev/api.json",
+            json=mock_api_response,
+            headers={"Content-Type": "application/json"},
+        )
+
+        client = ModelsDevClient()
+
+        # Test with underscore - should be normalized to hyphen
+        info = client.get_model_info("github_copilot", "gpt-4o", force_refresh=True)
+
+        expected_info = {
+            "name": "GPT-4o",
+            "attachment": True,
+            "provider": "github-copilot",
+            "id": "gpt-4o",
+        }
+        assert info == expected_info
+
+    def test_get_model_info_input_validation(self) -> None:
+        """Test input validation for provider and model names."""
+        client = ModelsDevClient()
+
+        # Test empty provider
+        with pytest.raises(ValueError, match="Provider name is required"):
+            client.get_model_info("", "gpt-4")
+
+        # Test empty model
+        with pytest.raises(ValueError, match="Model name is required"):
+            client.get_model_info("openai", "")
+
+    def test_get_model_info_invalid_content_type(self, requests_mock: Mocker) -> None:
+        """Test error handling when API returns non-JSON content."""
+        requests_mock.get(
+            "https://models.dev/api.json",
+            text="<html>404 Not Found</html>",
+            headers={"Content-Type": "text/html"},
+        )
+
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch("pathlib.Path.home", return_value=Path(temp_dir)),
+        ):
+            client = ModelsDevClient()
+
+            # Clear any existing cache
+            client.clear_cache()
+
+            with pytest.raises(
+                ValueError, match="Expected JSON response, got text/html"
+            ):
+                client.get_model_info("openai", "gpt-4", force_refresh=True)
