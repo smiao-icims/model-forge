@@ -147,9 +147,7 @@ class TestModelsDevClient:
             "provider": "openai",
             "description": "GPT-4 model",
         }
-        requests_mock.get(
-            "https://models.dev/api/v1/models/openai/gpt-4", json=mock_info
-        )
+        requests_mock.get("https://models.dev/models/openai/gpt-4", json=mock_info)
 
         client = ModelsDevClient()
         info = client.get_model_info("openai", "gpt-4")
