@@ -123,3 +123,46 @@ class TestCLIModelsCommands:
                 cli, ["models", "search", "test", "--max-price", "0.1"]
             )
             assert result.exit_code == 0
+
+    def test_models_list_shows_rich_descriptions(self) -> None:
+        """Test that models list shows meaningful descriptions, not empty ones."""
+        mock_models = [
+            {
+                "id": "gpt-4o",
+                "provider": "openai",
+                "display_name": "GPT-4o",
+                "description": "Multimodal model, $2.5/1K input, 128K context",
+                "capabilities": ["multimodal", "vision", "function_calling"],
+                "context_length": 128000,
+                "max_tokens": 16384,
+                "pricing": {"input_per_1k_tokens": 2.5, "output_per_1k_tokens": 10},
+            },
+            {
+                "id": "o1-preview",
+                "provider": "openai",
+                "display_name": "o1-preview",
+                "description": "Reasoning model, $15/1K input, 128K context",
+                "capabilities": ["reasoning"],
+                "context_length": 128000,
+                "max_tokens": 32768,
+                "pricing": {"input_per_1k_tokens": 15, "output_per_1k_tokens": 60},
+            },
+        ]
+
+        with patch("modelforge.cli.ModelsDevClient") as mock_client:
+            mock_client.return_value.get_models.return_value = mock_models
+            result = self.runner.invoke(cli, ["models", "list"])
+
+            assert result.exit_code == 0
+            assert "Found 2 models:" in result.output
+
+            # Should not have empty descriptions (the bug we fixed)
+            assert " - \n" not in result.output
+            assert " - " in result.output  # Should have descriptions
+
+            # Should have meaningful content
+            assert "Multimodal model" in result.output
+            assert "Reasoning model" in result.output
+            assert "$2.5/1K input" in result.output
+            assert "$15/1K input" in result.output
+            assert "128K context" in result.output
