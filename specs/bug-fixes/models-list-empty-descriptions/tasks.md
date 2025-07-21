@@ -5,18 +5,18 @@
 ### Phase 1: Core Fix ✅
 
 #### Data Parsing Enhancement
-- [ ] **TASK-001**: Update `_parse_model_data()` method to correctly extract model metadata
-- [ ] **TASK-002**: Create `_generate_model_description()` method for rich descriptions
-- [ ] **TASK-003**: Add `_extract_capabilities()` helper method
-- [ ] **TASK-004**: Add `_extract_pricing()` helper method
-- [ ] **TASK-005**: Update model data structure mapping to use correct API fields
+- [x] **TASK-001**: Update `_parse_model_data()` method to correctly extract model metadata
+- [x] **TASK-002**: Create `_generate_model_description()` method for rich descriptions
+- [x] **TASK-003**: Add `_extract_capabilities()` helper method
+- [x] **TASK-004**: Add `_extract_pricing()` helper method
+- [x] **TASK-005**: Update model data structure mapping to use correct API fields
 
 #### Description Generation Logic
-- [ ] **TASK-006**: Implement model type detection (reasoning, multimodal, text)
-- [ ] **TASK-007**: Add pricing information formatting ($X/1K tokens)
-- [ ] **TASK-008**: Add context length formatting (XK context)
-- [ ] **TASK-009**: Add capability detection (vision, audio, function calling)
-- [ ] **TASK-010**: Implement graceful fallbacks for missing data
+- [x] **TASK-006**: Implement model type detection (reasoning, multimodal, text)
+- [x] **TASK-007**: Add pricing information formatting ($X/1K tokens)
+- [x] **TASK-008**: Add context length formatting (XK context)
+- [x] **TASK-009**: Add capability detection (vision, audio, function calling)
+- [x] **TASK-010**: Implement graceful fallbacks for missing data
 
 ### Phase 2: Enhancement ✅
 
@@ -41,11 +41,11 @@
 ### Phase 3: Testing ✅
 
 #### Unit Tests
-- [ ] **TASK-023**: Test `_generate_model_description()` with complete data
-- [ ] **TASK-024**: Test `_generate_model_description()` with minimal data
-- [ ] **TASK-025**: Test `_extract_capabilities()` with various model types
-- [ ] **TASK-026**: Test `_extract_pricing()` with different pricing structures
-- [ ] **TASK-027**: Test error handling with malformed data
+- [x] **TASK-023**: Test `_generate_model_description()` with complete data
+- [x] **TASK-024**: Test `_generate_model_description()` with minimal data
+- [x] **TASK-025**: Test `_extract_capabilities()` with various model types
+- [x] **TASK-026**: Test `_extract_pricing()` with different pricing structures
+- [x] **TASK-027**: Test error handling with malformed data
 
 #### Integration Tests
 - [ ] **TASK-028**: Test `models list` command with fresh API data

@@ -1,4 +1,4 @@
-# Distribution Packaging Implementation Tasks - ModelForge v0.2.0
+# Distribution Packaging Implementation Tasks - ModelForge v0.2.6
 
 ## Package Configuration ✅
 
@@ -88,7 +88,7 @@
 - [ ] **TASK-055**: Perform security audit
 
 ### Initial Release
-- [ ] **TASK-056**: Create v0.2.0 release
+- [ ] **TASK-056**: Create v0.2.6 release
 - [ ] **TASK-057**: Publish to TestPyPI
 - [ ] **TASK-058**: Validate TestPyPI installation
 - [ ] **TASK-059**: Publish to PyPI

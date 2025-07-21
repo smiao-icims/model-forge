@@ -1,4 +1,4 @@
-# Distribution Packaging Design - ModelForge v0.2.0
+# Distribution Packaging Design - ModelForge v0.2.6
 
 ## Architecture Overview
 
@@ -36,7 +36,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "modelforge"
-version = "0.2.0"
+version = "0.2.6"
 description = "A reusable library for managing LLM providers, authentication, and model selection"
 readme = "README.md"
 requires-python = ">=3.11"

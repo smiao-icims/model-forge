@@ -1,4 +1,4 @@
-# Distribution Packaging Requirements - ModelForge v0.2.0
+# Distribution Packaging Requirements - ModelForge v0.2.6
 
 ## Functional Requirements
 
