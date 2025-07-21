@@ -353,8 +353,10 @@ class ModelsDevClient:
         self, provider: str | None = None, force_refresh: bool = False
     ) -> list[dict[str, Any]]:
         """Get list of models from models.dev."""
-        cache_path = self._get_cache_path("models", provider or "all")
-        return self._fetch_models(cache_path, provider, force_refresh)
+        # Normalize provider name if provided (replace underscores with hyphens)
+        normalized_provider = provider.replace("_", "-") if provider else None
+        cache_path = self._get_cache_path("models", normalized_provider or "all")
+        return self._fetch_models(cache_path, normalized_provider, force_refresh)
 
     def _fetch_model_info(  # noqa: PLR0912
         self, cache_path: Path, provider: str, model: str, force_refresh: bool = False
@@ -499,6 +501,7 @@ class ModelsDevClient:
                 return cached_data
 
         try:
+            # Provider is already normalized by get_provider_config
             url = f"{self.BASE_URL}/providers/{provider}/config"
             response = self.session.get(url)
             response.raise_for_status()
@@ -530,8 +533,12 @@ class ModelsDevClient:
         self, provider: str, force_refresh: bool = False
     ) -> dict[str, Any]:
         """Get configuration template for a provider."""
-        cache_path = self._get_cache_path("provider_config", provider)
-        return self._fetch_provider_config(cache_path, provider, force_refresh)
+        # Normalize provider name (replace underscores with hyphens)
+        normalized_provider = provider.replace("_", "-")
+        cache_path = self._get_cache_path("provider_config", normalized_provider)
+        return self._fetch_provider_config(
+            cache_path, normalized_provider, force_refresh
+        )
 
     def clear_cache(self) -> None:
         """Clear all cached data."""
