@@ -113,6 +113,20 @@ exclude = [
     "venv",
 ]
 
+# Per-file ignores for test files
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "ANN401",  # Allow Any type in tests (common for mocks)
+    "S101",    # Allow assert in tests
+    "S108",    # Allow hardcoded temp paths in tests
+    "PT019",   # Allow pytest fixtures without value
+    "PLR2004", # Allow magic value comparison in tests
+    "TRY002",  # Allow custom exceptions in tests
+    "ARG001",  # Allow unused function arguments (common in test fixtures)
+    "PLR0913", # Allow many arguments in test functions
+    "E501",    # Allow longer lines in tests (for assertions)
+]
+
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
 quote-style = "double"
