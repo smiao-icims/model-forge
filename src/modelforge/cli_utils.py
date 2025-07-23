@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import sys
 import traceback
 from collections.abc import Callable
@@ -120,6 +121,10 @@ def handle_cli_errors(func: F) -> F:
     Returns:
         Decorated function with error handling
     """
+    # Check if the original function expects a context parameter
+    sig = inspect.signature(func)
+    params = list(sig.parameters.keys())
+    expects_context = len(params) > 0 and (params[0] in {"ctx", "_ctx", "context"})
 
     @functools.wraps(func)
     @click.pass_context
@@ -130,7 +135,10 @@ def handle_cli_errors(func: F) -> F:
         formatter = ErrorFormatter(verbose=verbose, debug=debug)
 
         try:
-            return func(ctx, *args, **kwargs)
+            # Call the function with or without context based on its signature
+            if expects_context:
+                return func(ctx, *args, **kwargs)
+            return func(*args, **kwargs)
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully
             click.echo("\n⚠️  Operation cancelled by user", err=True)
@@ -192,7 +200,7 @@ def confirm_action(message: str, default: bool = False) -> bool:
     Returns:
         True if user confirms, False otherwise
     """
-    return click.confirm(click.style(f"❓ {message}", fg="cyan"), default=default)
+    return bool(click.confirm(click.style(f"❓ {message}", fg="cyan"), default=default))
 
 
 def format_table(

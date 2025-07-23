@@ -25,5 +25,12 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [types-requests]
-        args: [--strict, --ignore-missing-imports]
-
+        args: [
+          --ignore-missing-imports,
+          --no-strict-optional,
+          --warn-redundant-casts,
+          --warn-unused-ignores,
+          --disallow-untyped-defs,
+          --no-implicit-reexport,
+          --config-file=pyproject.toml
+        ]

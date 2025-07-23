@@ -1,5 +1,6 @@
 """Tests for retry mechanism."""
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -48,14 +49,13 @@ class TestRetryOnError:
         call_count = 0
 
         @retry_on_error(max_retries=2)
-        def always_fails():
+        def always_fails() -> None:
             nonlocal call_count
             call_count += 1
             raise NetworkTimeoutError("API call")
 
-        with patch("time.sleep"):
-            with pytest.raises(NetworkTimeoutError):
-                always_fails()
+        with patch("time.sleep"), pytest.raises(NetworkTimeoutError):
+            always_fails()
 
         assert call_count == 3  # Initial + 2 retries
 
@@ -64,22 +64,22 @@ class TestRetryOnError:
         call_count = 0
 
         @retry_on_error(max_retries=3)
-        def unexpected_error():
+        def unexpected_error() -> None:
             nonlocal call_count
             call_count += 1
             raise ValueError("Unexpected error")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Unexpected error"):
             unexpected_error()
 
         assert call_count == 1  # No retries
 
     def test_rate_limit_retry_after(self) -> None:
         """Test that rate limit retry_after is honored."""
-        sleep_times = []
+        sleep_times: list[float] = []
 
         @retry_on_error(max_retries=1)
-        def rate_limited():
+        def rate_limited() -> str:
             if not sleep_times:
                 raise RateLimitError("API", retry_after=5)
             return "success"
@@ -93,7 +93,7 @@ class TestRetryOnError:
 
     def test_exponential_backoff(self) -> None:
         """Test exponential backoff calculation."""
-        sleep_times = []
+        sleep_times: list[float] = []
         call_count = 0
 
         @retry_on_error(max_retries=3, backoff_factor=2.0)
@@ -113,7 +113,7 @@ class TestRetryOnError:
 
     def test_max_wait_limit(self) -> None:
         """Test that wait time is capped by max_wait."""
-        sleep_times = []
+        sleep_times: list[float] = []
 
         @retry_on_error(max_retries=5, backoff_factor=10.0, max_wait=5.0)
         def failing_func() -> str:
@@ -137,7 +137,7 @@ class TestRetryOnError:
         call_count = 0
 
         @retry_on_error(max_retries=2, errors=(CustomError,), backoff_factor=0.1)
-        def custom_error_func():
+        def custom_error_func() -> str:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
@@ -165,28 +165,28 @@ class TestRetryOnError:
         with pytest.raises(ValueError, match="max_retries must be non-negative"):
 
             @retry_on_error(max_retries=-1)
-            def func():
+            def func() -> None:
                 pass
 
         with pytest.raises(ValueError, match="backoff_factor must be positive"):
 
             @retry_on_error(backoff_factor=0)
-            def func():
+            def func() -> None:
                 pass
 
         with pytest.raises(ValueError, match="max_wait must be positive"):
 
             @retry_on_error(max_wait=0)
-            def func():
+            def func() -> None:
                 pass
 
     @patch("modelforge.retry.logger")
-    def test_logging(self, mock_logger) -> None:
+    def test_logging(self, mock_logger: Any) -> None:
         """Test that retries are logged."""
         call_count = 0
 
         @retry_on_error(max_retries=1, backoff_factor=0.1)
-        def failing_once():
+        def failing_once() -> str:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -203,16 +203,15 @@ class TestRetryOnError:
         assert "Retrying in" in warning_msg
 
     @patch("modelforge.retry.logger")
-    def test_final_failure_logged(self, mock_logger) -> None:
+    def test_final_failure_logged(self, mock_logger: Any) -> None:
         """Test that final failure is logged."""
 
         @retry_on_error(max_retries=1)
-        def always_fails():
+        def always_fails() -> None:
             raise NetworkTimeoutError("API call")
 
-        with patch("time.sleep"):
-            with pytest.raises(NetworkTimeoutError):
-                always_fails()
+        with patch("time.sleep"), pytest.raises(NetworkTimeoutError):
+            always_fails()
 
         mock_logger.error.assert_called_once()
         error_msg = mock_logger.error.call_args[0][0]
@@ -222,7 +221,7 @@ class TestRetryOnError:
         """Test that function metadata is preserved."""
 
         @retry_on_error()
-        def documented_func():
+        def documented_func() -> str:
             """This is a documented function."""
             return "result"
 
@@ -237,7 +236,7 @@ class TestRetryWithBackoff:
         """Test basic usage of retry_with_backoff."""
         call_count = 0
 
-        def flaky_func(value):
+        def flaky_func(value: str) -> str:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
@@ -255,7 +254,7 @@ class TestRetryWithBackoff:
     def test_with_kwargs(self) -> None:
         """Test retry_with_backoff with keyword arguments."""
 
-        def func_with_kwargs(a, b=None):
+        def func_with_kwargs(a: str, b: str | None = None) -> str:
             if b != "expected":
                 raise NetworkTimeoutError("API call")
             return f"{a}-{b}"
@@ -269,7 +268,7 @@ class TestRetryWithBackoff:
 
     def test_custom_parameters(self) -> None:
         """Test retry_with_backoff with custom parameters."""
-        sleep_times = []
+        sleep_times: list[float] = []
 
         def failing_func() -> str:
             if len(sleep_times) < 2:

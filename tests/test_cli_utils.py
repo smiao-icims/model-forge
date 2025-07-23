@@ -77,15 +77,15 @@ class TestErrorFormatter:
         formatter = ErrorFormatter()
 
         # ConfigurationNotFoundError
-        error = ConfigurationNotFoundError("openai", "gpt-4")
-        result = formatter.format_error(error)
+        config_error = ConfigurationNotFoundError("openai", "gpt-4")
+        result = formatter.format_error(config_error)
         assert "No configuration found for provider 'openai'" in result
         assert "Attempting to use model 'gpt-4'" in result
         assert "modelforge config add --provider openai" in result
 
         # NetworkTimeoutError
-        error = NetworkTimeoutError("API call", timeout=30)
-        result = formatter.format_error(error)
+        timeout_error = NetworkTimeoutError("API call", timeout=30)
+        result = formatter.format_error(timeout_error)
         assert "Network timeout during API call" in result
         assert "Request timed out after 30 seconds" in result
 
@@ -136,7 +136,7 @@ class TestHandleCliErrors:
         def test_command(ctx: click.Context) -> None:
             if ctx.obj.get("raise_error"):
                 raise InvalidInputError("Test error", suggestion="Fix it")
-            return ctx.obj.get("value", "success")
+            # Click commands don't return values
 
         runner = CliRunner()
 

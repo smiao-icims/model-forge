@@ -1,6 +1,7 @@
 """Tests for the authentication module."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -22,19 +23,19 @@ def mock_config(mocker: MockerFixture) -> Mock:
 
 
 @pytest.fixture
-def mock_getpass(mocker: MockerFixture) -> Mock:
+def mock_getpass(mocker: MockerFixture) -> Any:
     """Mocks the getpass.getpass function."""
     return mocker.patch("modelforge.auth.getpass.getpass", return_value="test-api-key")
 
 
 @pytest.fixture
-def mock_requests(mocker: MockerFixture) -> Mock:
+def mock_requests(mocker: MockerFixture) -> Any:
     """Mocks the requests module."""
     return mocker.patch("modelforge.auth.requests", autospec=True)
 
 
 @pytest.fixture
-def mock_webbrowser(mocker: MockerFixture) -> Mock:
+def mock_webbrowser(mocker: MockerFixture) -> Any:
     """Mocks the webbrowser module."""
     return mocker.patch("webbrowser.open", autospec=True)
 

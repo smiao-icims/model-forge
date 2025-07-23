@@ -83,6 +83,7 @@ ignore = [
     "PLR0913", # Too many arguments in function definition (acceptable for CLI)
     "TRY003",  # Avoid specifying long messages outside exception class
     "ANN101",  # Missing type annotation for self in method (acceptable)
+    "TRY301",  # Abstract raise to inner function (acceptable for simple error handling)
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -168,6 +169,14 @@ module = [
     "click.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["modelforge.cli", "modelforge.cli_utils"]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

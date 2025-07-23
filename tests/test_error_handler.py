@@ -46,9 +46,7 @@ class TestHandleErrors:
 
         @handle_errors("API call")
         def timeout_func() -> None:
-            error = requests.exceptions.Timeout()
-            error.timeout = 30
-            raise error
+            raise requests.exceptions.Timeout("Request timed out")
 
         with pytest.raises(NetworkTimeoutError) as exc_info:
             timeout_func()
@@ -157,8 +155,8 @@ class TestHandleErrors:
 
         @handle_errors("dict access")
         def key_error_func() -> None:
-            d = {}
-            return d["missing_key"]
+            d: dict[str, str] = {}
+            _ = d["missing_key"]
 
         with pytest.raises(InternalError) as exc_info:
             key_error_func()
@@ -170,7 +168,7 @@ class TestHandleErrors:
 
         @handle_errors("conversion")
         def value_error_func() -> None:
-            return int("not a number")
+            _ = int("not a number")
 
         with pytest.raises(InternalError) as exc_info:
             value_error_func()

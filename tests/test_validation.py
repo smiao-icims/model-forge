@@ -187,11 +187,13 @@ class TestFilePathValidation:
 
     def test_expanduser(self) -> None:
         """Test tilde expansion."""
-        with patch("pathlib.Path.expanduser") as mock_expand:
-            with patch("pathlib.Path.exists"):
-                mock_expand.return_value = Path("/home/user/file.txt")
-                InputValidator.validate_file_path("~/file.txt")
-                mock_expand.assert_called_once()
+        with (
+            patch("pathlib.Path.expanduser") as mock_expand,
+            patch("pathlib.Path.exists"),
+        ):
+            mock_expand.return_value = Path("/home/user/file.txt")
+            InputValidator.validate_file_path("~/file.txt")
+            mock_expand.assert_called_once()
 
     @patch("pathlib.Path.exists")
     def test_must_exist_validation(self, mock_exists: Any) -> None:

@@ -3,12 +3,12 @@ import subprocess
 import sys
 
 from modelforge import config
-from modelforge.registry import (
+from modelforge.exceptions import (
     ConfigurationError,
-    ModelForgeRegistry,
     ModelNotFoundError,
     ProviderError,
 )
+from modelforge.registry import ModelForgeRegistry
 
 PROMPT = "Say hello from GitHub Copilot!"
 COPILOT_PROVIDER = "github_copilot"

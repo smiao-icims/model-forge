@@ -23,7 +23,7 @@ class TestCLIAuthCommands:
     def test_auth_login_nonexistent_provider(self) -> None:
         """Test auth login with non-existent provider."""
         result = self.runner.invoke(cli, ["auth", "login", "--provider", "nonexistent"])
-        assert result.exit_code == 0
+        assert result.exit_code == 1  # Error exit code with new error handling
         assert "not found in configuration" in result.output
 
     def test_auth_logout_no_provider(self) -> None:
@@ -37,7 +37,7 @@ class TestCLIAuthCommands:
         result = self.runner.invoke(
             cli, ["auth", "logout", "--provider", "nonexistent"]
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 1  # Error exit code with new error handling
         assert "not found" in result.output
 
     def test_auth_status_no_providers(self) -> None:
@@ -50,7 +50,7 @@ class TestCLIAuthCommands:
         result = self.runner.invoke(
             cli, ["auth", "status", "--provider", "nonexistent"]
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 1  # Error exit code with new error handling
         assert "not found in configuration" in result.output
 
     def test_auth_logout_all_providers(self) -> None:
