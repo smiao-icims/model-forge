@@ -24,6 +24,7 @@ from .exceptions import (
     InvalidInputError,
     ModelNotFoundError,
     ProviderError,
+    RateLimitError,
 )
 from .logging_config import get_logger
 from .modelsdev import ModelsDevClient
@@ -706,8 +707,6 @@ def _invoke_with_smart_retry(
         RateLimitError: If max retries are reached for rate limiting
         ProviderError: For non-rate-limit errors
     """
-    from .exceptions import RateLimitError
-
     for attempt in range(max_retries):
         try:
             if attempt > 0:
