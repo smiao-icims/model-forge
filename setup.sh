@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ModelForge Setup Script
-# This script sets up the development environment and installs dependencies
+# This script sets up the development environment and installs dependencies using uv
 
 set -e  # Exit on any error
 
@@ -34,6 +34,7 @@ print_header() {
     echo "╔══════════════════════════════════════════════════════════════╗"
     echo "║                    ModelForge Setup Script                  ║"
     echo "║        A reusable library for managing LLM providers        ║"
+    echo "║                      Powered by uv ⚡                       ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -61,24 +62,24 @@ check_python_version() {
     print_success "Python version $python_version is compatible"
 }
 
-# Function to install Poetry
-install_poetry() {
-    if ! command_exists poetry; then
-        print_info "Poetry not found. Installing Poetry..."
-        curl -sSL https://install.python-poetry.org | python3 -
+# Function to install uv
+install_uv() {
+    if ! command_exists uv; then
+        print_info "uv not found. Installing uv..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
 
-        # Add Poetry to PATH for current session
-        export PATH="$HOME/.local/bin:$PATH"
+        # Add uv to PATH for current session
+        export PATH="$HOME/.cargo/bin:$PATH"
 
-        if ! command_exists poetry; then
-            print_error "Poetry installation failed. Please install Poetry manually and try again."
-            print_info "Visit: https://python-poetry.org/docs/#installation"
+        if ! command_exists uv; then
+            print_error "uv installation failed. Please install uv manually and try again."
+            print_info "Visit: https://docs.astral.sh/uv/getting-started/installation/"
             exit 1
         fi
 
-        print_success "Poetry installed successfully"
+        print_success "uv installed successfully"
     else
-        print_success "Poetry is already installed"
+        print_success "uv is already installed"
     fi
 }
 
@@ -86,38 +87,27 @@ install_poetry() {
 setup_environment() {
     print_info "Setting up virtual environment and installing dependencies..."
 
-    # Configure Poetry to create virtual environment in project directory
-    poetry config virtualenvs.in-project true
-
-    # Install dependencies
-    poetry install
+    # Create and sync virtual environment with dependencies
+    uv sync --extra dev
 
     print_success "Dependencies installed successfully"
 
     # Set up pre-commit hooks
     print_info "Setting up pre-commit hooks..."
-    poetry run pre-commit install
-    print_success "Pre-commit hooks installed"
+    if uv run pre-commit install; then
+        print_success "Pre-commit hooks installed"
+    else
+        print_warning "Pre-commit hooks installation failed, but continuing..."
+    fi
 }
 
 # Function to activate virtual environment
 activate_environment() {
-    print_info "Activating virtual environment..."
-
-    # Check if we're already in a virtual environment
-    if [ -n "$VIRTUAL_ENV" ]; then
-        print_warning "Already in a virtual environment: $VIRTUAL_ENV"
-        return
-    fi
-
-    # Try to activate the Poetry virtual environment
-    if [ -d ".venv" ]; then
-        source .venv/bin/activate
-        print_success "Virtual environment activated"
-    else
-        print_warning "Virtual environment not found. Running poetry shell..."
-        poetry shell
-    fi
+    print_info "To activate the virtual environment, run:"
+    echo -e "${YELLOW}source .venv/bin/activate${NC}"
+    echo
+    print_info "Or use uv to run commands directly:"
+    echo -e "${YELLOW}uv run <command>${NC}"
 }
 
 # Function to display usage instructions
@@ -130,18 +120,22 @@ show_usage() {
     echo
     echo "📋 Next steps:"
     echo "   1. Activate the virtual environment:"
-    echo -e "      ${YELLOW}poetry shell${NC}"
+    echo -e "      ${YELLOW}source .venv/bin/activate${NC}"
+    echo -e "      ${BLUE}Or use: ${YELLOW}uv run <command>${NC}"
     echo
     echo "   2. Try the ModelForge CLI:"
-    echo -e "      ${YELLOW}modelforge config show${NC}"
-    echo -e "      ${YELLOW}modelforge config add --provider ollama --model qwen3:1.7b${NC}"
+    echo -e "      ${YELLOW}uv run modelforge config show${NC}"
+    echo -e "      ${YELLOW}uv run modelforge config add --provider ollama --model qwen3:1.7b${NC}"
     echo
     echo "   3. Use in your Python code:"
     echo -e "      ${YELLOW}from modelforge.registry import ModelForgeRegistry${NC}"
     echo -e "      ${YELLOW}registry = ModelForgeRegistry()${NC}"
     echo
     echo "   4. Run tests:"
-    echo -e "      ${YELLOW}pytest${NC}"
+    echo -e "      ${YELLOW}uv run pytest${NC}"
+    echo
+    echo "   5. Run pre-commit checks:"
+    echo -e "      ${YELLOW}uv run pre-commit run --all-files${NC}"
     echo
     echo "📚 For more information, check the README.md file"
     echo
@@ -150,7 +144,7 @@ show_usage() {
 # Function to run tests
 run_tests() {
     print_info "Running tests..."
-    if poetry run pytest; then
+    if uv run pytest; then
         print_success "All tests passed!"
     else
         print_warning "Some tests failed. Check the output above."
@@ -184,7 +178,7 @@ main() {
     done
 
     if [ "$HELP" = true ]; then
-        echo "ModelForge Setup Script"
+        echo "ModelForge Setup Script (powered by uv)"
         echo
         echo "Usage: $0 [OPTIONS]"
         echo
@@ -194,10 +188,11 @@ main() {
         echo
         echo "This script will:"
         echo "  1. Check Python version compatibility"
-        echo "  2. Install Poetry if not present"
+        echo "  2. Install uv if not present"
         echo "  3. Set up virtual environment"
-        echo "  4. Install all dependencies"
-        echo "  5. Run tests (unless --skip-tests is used)"
+        echo "  4. Install all dependencies including dev dependencies"
+        echo "  5. Set up pre-commit hooks"
+        echo "  6. Run tests (unless --skip-tests is used)"
         echo
         exit 0
     fi
@@ -210,7 +205,7 @@ main() {
 
     # Execute setup steps
     check_python_version
-    install_poetry
+    install_uv
     setup_environment
 
     # Run tests unless skipped

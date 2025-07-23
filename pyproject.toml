@@ -59,6 +59,9 @@ Documentation = "https://model-forge.readthedocs.io"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-dir]
+"" = "src"
+
 [tool.setuptools.dynamic]
 version = {attr = "modelforge.__version__"}
 
@@ -211,6 +214,4 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
-[tool.poetry.group.dev.dependencies]
-requests-mock = "^1.12.1"
-build = "^1.2.2.post1"
+# Removed Poetry-specific sections - now using uv
