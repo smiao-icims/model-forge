@@ -1,5 +1,6 @@
 """Tests for CLI utilities."""
 
+from typing import Any
 from unittest.mock import patch
 
 import click
@@ -24,7 +25,7 @@ from modelforge.exceptions import (
 class TestErrorFormatter:
     """Test ErrorFormatter class."""
 
-    def test_format_modelforge_error_basic(self):
+    def test_format_modelforge_error_basic(self) -> None:
         """Test formatting basic ModelForgeError."""
         formatter = ErrorFormatter()
         error = ModelForgeError("Something went wrong")
@@ -34,7 +35,7 @@ class TestErrorFormatter:
         assert "Context:" not in result
         assert "Suggestion:" not in result
 
-    def test_format_modelforge_error_with_context(self):
+    def test_format_modelforge_error_with_context(self) -> None:
         """Test formatting error with context."""
         formatter = ErrorFormatter()
         error = ModelForgeError(
@@ -48,7 +49,7 @@ class TestErrorFormatter:
         assert "Context: File not found" in result
         assert "💡 Suggestion: Check the file path" in result
 
-    def test_format_modelforge_error_verbose(self):
+    def test_format_modelforge_error_verbose(self) -> None:
         """Test verbose formatting with error code."""
         formatter = ErrorFormatter(verbose=True)
         error = ModelForgeError(
@@ -59,7 +60,7 @@ class TestErrorFormatter:
 
         assert "Code: TEST_ERROR" in result
 
-    def test_format_modelforge_error_debug(self):
+    def test_format_modelforge_error_debug(self) -> None:
         """Test debug formatting with details."""
         formatter = ErrorFormatter(debug=True)
         error = ModelForgeError(
@@ -71,7 +72,7 @@ class TestErrorFormatter:
         assert "Details: {'key': 'value'}" in result
         assert "Traceback:" in result
 
-    def test_format_specific_errors(self):
+    def test_format_specific_errors(self) -> None:
         """Test formatting specific error types."""
         formatter = ErrorFormatter()
 
@@ -88,7 +89,7 @@ class TestErrorFormatter:
         assert "Network timeout during API call" in result
         assert "Request timed out after 30 seconds" in result
 
-    def test_format_generic_error(self):
+    def test_format_generic_error(self) -> None:
         """Test formatting generic Python exceptions."""
         formatter = ErrorFormatter()
         error = ValueError("Invalid value")
@@ -97,7 +98,7 @@ class TestErrorFormatter:
         assert "❌ Error (ValueError): Invalid value" in result
         assert "Suggestion:" not in result  # No suggestion in non-verbose mode
 
-    def test_format_generic_error_verbose(self):
+    def test_format_generic_error_verbose(self) -> None:
         """Test verbose formatting of generic errors."""
         formatter = ErrorFormatter(verbose=True)
         error = KeyError("missing_key")
@@ -106,12 +107,15 @@ class TestErrorFormatter:
         assert "❌ Error (KeyError):" in result
         assert "This might be a bug" in result
 
-    def test_format_generic_error_debug(self):
+    def test_format_generic_error_debug(self) -> None:
         """Test debug formatting with full traceback."""
         formatter = ErrorFormatter(debug=True)
 
-        try:
+        def _raise_error() -> None:
             raise RuntimeError("Test error")
+
+        try:
+            _raise_error()
         except RuntimeError as e:
             result = formatter.format_error(e)
 
@@ -123,13 +127,13 @@ class TestErrorFormatter:
 class TestHandleCliErrors:
     """Test handle_cli_errors decorator."""
 
-    def test_handle_cli_errors_integration(self):
+    def test_handle_cli_errors_integration(self) -> None:
         """Test handle_cli_errors with a real Click command."""
         from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors
-        def test_command(ctx):
+        def test_command(ctx: click.Context) -> None:
             if ctx.obj.get("raise_error"):
                 raise InvalidInputError("Test error", suggestion="Fix it")
             return ctx.obj.get("value", "success")
@@ -146,13 +150,13 @@ class TestHandleCliErrors:
         assert "❌ Error: Test error" in result.output
         assert "💡 Suggestion: Fix it" in result.output
 
-    def test_keyboard_interrupt_handling(self):
+    def test_keyboard_interrupt_handling(self) -> None:
         """Test handling of keyboard interrupt."""
         from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors
-        def test_command(ctx):
+        def test_command(_ctx: click.Context) -> None:
             raise KeyboardInterrupt
 
         runner = CliRunner()
@@ -161,13 +165,13 @@ class TestHandleCliErrors:
         assert result.exit_code == 130
         assert "⚠️  Operation cancelled by user" in result.output
 
-    def test_click_exception_passthrough(self):
+    def test_click_exception_passthrough(self) -> None:
         """Test that Click exceptions pass through properly."""
         from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors
-        def test_command(ctx):
+        def test_command(_ctx: click.Context) -> None:
             raise click.ClickException("Click error")
 
         runner = CliRunner()
@@ -177,13 +181,13 @@ class TestHandleCliErrors:
         assert result.exit_code != 0
         assert "Click error" in result.output
 
-    def test_verbose_and_debug_modes(self):
+    def test_verbose_and_debug_modes(self) -> None:
         """Test verbose and debug mode error formatting."""
         from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors
-        def test_command(ctx):
+        def test_command(_ctx: click.Context) -> None:
             raise NetworkTimeoutError("API call", timeout=30)
 
         runner = CliRunner()
@@ -202,7 +206,7 @@ class TestPrintFunctions:
     """Test print utility functions."""
 
     @patch("click.echo")
-    def test_print_success(self, mock_echo):
+    def test_print_success(self, mock_echo: Any) -> None:
         """Test print_success."""
         print_success("Operation completed")
         mock_echo.assert_called_once()
@@ -210,7 +214,7 @@ class TestPrintFunctions:
         assert "✅ Operation completed" in call_args
 
     @patch("click.echo")
-    def test_print_warning(self, mock_echo):
+    def test_print_warning(self, mock_echo: Any) -> None:
         """Test print_warning."""
         print_warning("Something might be wrong")
         mock_echo.assert_called_once_with(
@@ -219,7 +223,7 @@ class TestPrintFunctions:
         )
 
     @patch("click.echo")
-    def test_print_info(self, mock_echo):
+    def test_print_info(self, mock_echo: Any) -> None:
         """Test print_info."""
         print_info("Here's some information")
         mock_echo.assert_called_once()
@@ -227,7 +231,7 @@ class TestPrintFunctions:
         assert "ℹ️  Here's some information" in call_args
 
     @patch("click.confirm")
-    def test_confirm_action(self, mock_confirm):
+    def test_confirm_action(self, mock_confirm: Any) -> None:
         """Test confirm_action."""
         mock_confirm.return_value = True
         result = confirm_action("Continue?", default=False)
@@ -241,7 +245,7 @@ class TestPrintFunctions:
 class TestFormatTable:
     """Test format_table function."""
 
-    def test_basic_table(self):
+    def test_basic_table(self) -> None:
         """Test basic table formatting."""
         headers = ["Name", "Age", "City"]
         rows = [
@@ -256,12 +260,12 @@ class TestFormatTable:
         assert "Alice | 25  | New York" in result
         assert "Bob   | 30  | San Francisco" in result
 
-    def test_empty_table(self):
+    def test_empty_table(self) -> None:
         """Test empty table."""
         result = format_table(["Col1", "Col2"], [])
         assert result == "No data to display"
 
-    def test_table_with_max_width(self):
+    def test_table_with_max_width(self) -> None:
         """Test table with maximum column width."""
         headers = ["Short", "Very Long Header"]
         rows = [["OK", "This is a very long cell content that should be truncated"]]
@@ -271,7 +275,7 @@ class TestFormatTable:
         assert "Very Lo..." in result  # Header truncated
         assert "This is..." in result  # Cell truncated
 
-    def test_table_with_varying_widths(self):
+    def test_table_with_varying_widths(self) -> None:
         """Test table with varying column widths."""
         headers = ["ID", "Description"]
         rows = [

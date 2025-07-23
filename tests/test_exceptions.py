@@ -26,7 +26,7 @@ from modelforge.exceptions import (
 class TestModelForgeError:
     """Test base ModelForgeError class."""
 
-    def test_basic_initialization(self):
+    def test_basic_initialization(self) -> None:
         """Test basic exception initialization."""
         error = ModelForgeError("Test error")
         assert str(error) == "Test error"
@@ -36,7 +36,7 @@ class TestModelForgeError:
         assert error.error_code is None
         assert error.details == {}
 
-    def test_full_initialization(self):
+    def test_full_initialization(self) -> None:
         """Test exception with all parameters."""
         error = ModelForgeError(
             "Test error",
@@ -51,7 +51,7 @@ class TestModelForgeError:
         assert error.error_code == "TEST_ERROR"
         assert error.details == {"key": "value"}
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test converting exception to dictionary."""
         error = ModelForgeError(
             "Test error",
@@ -70,7 +70,7 @@ class TestModelForgeError:
             "details": {"key": "value"},
         }
 
-    def test_inheritance(self):
+    def test_inheritance(self) -> None:
         """Test that ModelForgeError inherits from Exception."""
         error = ModelForgeError("Test")
         assert isinstance(error, Exception)
@@ -79,13 +79,13 @@ class TestModelForgeError:
 class TestConfigurationErrors:
     """Test configuration-related errors."""
 
-    def test_configuration_error_inheritance(self):
+    def test_configuration_error_inheritance(self) -> None:
         """Test ConfigurationError inheritance."""
         error = ConfigurationError("Test")
         assert isinstance(error, ModelForgeError)
         assert isinstance(error, Exception)
 
-    def test_configuration_not_found_error(self):
+    def test_configuration_not_found_error(self) -> None:
         """Test ConfigurationNotFoundError."""
         # Without model
         error = ConfigurationNotFoundError("openai")
@@ -100,7 +100,7 @@ class TestConfigurationErrors:
         assert error.context == "Attempting to use model 'gpt-4'"
         assert error.suggestion == "Run 'modelforge config add --provider openai'"
 
-    def test_configuration_validation_error(self):
+    def test_configuration_validation_error(self) -> None:
         """Test ConfigurationValidationError."""
         error = ConfigurationValidationError("Invalid config")
         assert isinstance(error, ConfigurationError)
@@ -110,23 +110,23 @@ class TestConfigurationErrors:
 class TestAuthenticationErrors:
     """Test authentication-related errors."""
 
-    def test_authentication_error_inheritance(self):
+    def test_authentication_error_inheritance(self) -> None:
         """Test AuthenticationError inheritance."""
         error = AuthenticationError("Test")
         assert isinstance(error, ModelForgeError)
 
-    def test_invalid_api_key_error(self):
+    def test_invalid_api_key_error(self) -> None:
         """Test InvalidApiKeyError."""
         error = InvalidApiKeyError("openai")
         assert error.message == "Authentication failed for openai"
         assert error.context == "API key is invalid or expired"
-        assert (
-            error.suggestion
-            == "Update your API key with 'modelforge config add '--provider openai --api-key NEW_KEY'"
+        assert error.suggestion == (
+            "Update your API key with 'modelforge config add '"
+            "--provider openai --api-key NEW_KEY'"
         )
         assert error.error_code == "INVALID_API_KEY"
 
-    def test_token_expired_error(self):
+    def test_token_expired_error(self) -> None:
         """Test TokenExpiredError."""
         error = TokenExpiredError("github")
         assert error.message == "Authentication token expired for github"
@@ -141,12 +141,12 @@ class TestAuthenticationErrors:
 class TestNetworkErrors:
     """Test network-related errors."""
 
-    def test_network_error_inheritance(self):
+    def test_network_error_inheritance(self) -> None:
         """Test NetworkError inheritance."""
         error = NetworkError("Test")
         assert isinstance(error, ModelForgeError)
 
-    def test_network_timeout_error_basic(self):
+    def test_network_timeout_error_basic(self) -> None:
         """Test NetworkTimeoutError basic usage."""
         error = NetworkTimeoutError("API call")
         assert error.message == "Network timeout during API call"
@@ -154,19 +154,19 @@ class TestNetworkErrors:
         assert error.suggestion == "Check your internet connection or try again later"
         assert error.error_code == "NETWORK_TIMEOUT"
 
-    def test_network_timeout_error_with_timeout(self):
+    def test_network_timeout_error_with_timeout(self) -> None:
         """Test NetworkTimeoutError with timeout."""
         error = NetworkTimeoutError("API call", timeout=30)
         assert error.message == "Network timeout during API call"
         assert error.context == "Request timed out after 30 seconds"
         assert error.details == {"timeout": 30, "url": None}
 
-    def test_network_timeout_error_with_url(self):
+    def test_network_timeout_error_with_url(self) -> None:
         """Test NetworkTimeoutError with URL."""
         error = NetworkTimeoutError("API call", url="https://api.example.com")
         assert error.context == "Request to https://api.example.com"
 
-    def test_network_timeout_error_full(self):
+    def test_network_timeout_error_full(self) -> None:
         """Test NetworkTimeoutError with all parameters."""
         error = NetworkTimeoutError(
             "API call", timeout=30, url="https://api.example.com"
@@ -177,7 +177,7 @@ class TestNetworkErrors:
         )
         assert error.details == {"timeout": 30, "url": "https://api.example.com"}
 
-    def test_rate_limit_error_basic(self):
+    def test_rate_limit_error_basic(self) -> None:
         """Test RateLimitError basic usage."""
         error = RateLimitError("openai")
         assert error.message == "Rate limit exceeded for openai"
@@ -185,7 +185,7 @@ class TestNetworkErrors:
         assert error.suggestion == "Wait before retrying or upgrade your plan"
         assert error.error_code == "RATE_LIMIT_EXCEEDED"
 
-    def test_rate_limit_error_with_retry_after(self):
+    def test_rate_limit_error_with_retry_after(self) -> None:
         """Test RateLimitError with retry_after."""
         error = RateLimitError("openai", retry_after=60)
         assert error.message == "Rate limit exceeded for openai"
@@ -196,12 +196,12 @@ class TestNetworkErrors:
 class TestProviderErrors:
     """Test provider-related errors."""
 
-    def test_provider_error_inheritance(self):
+    def test_provider_error_inheritance(self) -> None:
         """Test ProviderError inheritance."""
         error = ProviderError("Test")
         assert isinstance(error, ModelForgeError)
 
-    def test_model_not_found_error_basic(self):
+    def test_model_not_found_error_basic(self) -> None:
         """Test ModelNotFoundError basic usage."""
         error = ModelNotFoundError("openai", "gpt-5")
         assert error.message == "Model 'gpt-5' not found for provider 'openai'"
@@ -213,13 +213,13 @@ class TestProviderErrors:
         assert error.error_code == "MODEL_NOT_FOUND"
         assert error.details == {"provider": "openai", "model": "gpt-5"}
 
-    def test_model_not_found_error_with_available_models(self):
+    def test_model_not_found_error_with_available_models(self) -> None:
         """Test ModelNotFoundError with available models."""
         models = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
         error = ModelNotFoundError("openai", "gpt-5", available_models=models)
         assert error.context == "Available models: gpt-3.5-turbo, gpt-4, gpt-4-turbo"
 
-    def test_model_not_found_error_with_many_models(self):
+    def test_model_not_found_error_with_many_models(self) -> None:
         """Test ModelNotFoundError with many available models."""
         models = [f"model-{i}" for i in range(10)]
         error = ModelNotFoundError("provider", "unknown", available_models=models)
@@ -228,7 +228,7 @@ class TestProviderErrors:
             == "Available models: model-0, model-1, model-2, model-3, model-4 (and 5 more)"
         )
 
-    def test_provider_not_available_error_basic(self):
+    def test_provider_not_available_error_basic(self) -> None:
         """Test ProviderNotAvailableError basic usage."""
         error = ProviderNotAvailableError("custom-provider")
         assert error.message == "Provider 'custom-provider' is not available"
@@ -239,7 +239,7 @@ class TestProviderErrors:
         )
         assert error.error_code == "PROVIDER_NOT_AVAILABLE"
 
-    def test_provider_not_available_error_with_reason(self):
+    def test_provider_not_available_error_with_reason(self) -> None:
         """Test ProviderNotAvailableError with reason."""
         error = ProviderNotAvailableError("openai", "Service is down for maintenance")
         assert error.context == "Service is down for maintenance"
@@ -248,18 +248,18 @@ class TestProviderErrors:
 class TestValidationErrors:
     """Test validation-related errors."""
 
-    def test_validation_error_inheritance(self):
+    def test_validation_error_inheritance(self) -> None:
         """Test ValidationError inheritance."""
         error = ValidationError("Test")
         assert isinstance(error, ModelForgeError)
 
-    def test_invalid_input_error(self):
+    def test_invalid_input_error(self) -> None:
         """Test InvalidInputError."""
         error = InvalidInputError("Invalid input")
         assert isinstance(error, ValidationError)
         assert str(error) == "Invalid input"
 
-    def test_file_validation_error_basic(self):
+    def test_file_validation_error_basic(self) -> None:
         """Test FileValidationError basic usage."""
         error = FileValidationError("/path/to/file", "File not found")
         assert error.message == "File validation failed: /path/to/file"
@@ -268,7 +268,7 @@ class TestValidationErrors:
         assert error.error_code == "FILE_VALIDATION_ERROR"
         assert error.details == {"file_path": "/path/to/file"}
 
-    def test_file_validation_error_with_suggestion(self):
+    def test_file_validation_error_with_suggestion(self) -> None:
         """Test FileValidationError with suggestion."""
         error = FileValidationError(
             "/path/to/file",
@@ -284,12 +284,12 @@ class TestValidationErrors:
 class TestJsonErrors:
     """Test JSON-related errors."""
 
-    def test_json_error_inheritance(self):
+    def test_json_error_inheritance(self) -> None:
         """Test JsonError inheritance."""
         error = JsonError("Test")
         assert isinstance(error, ModelForgeError)
 
-    def test_json_decode_error_basic(self):
+    def test_json_decode_error_basic(self) -> None:
         """Test JsonDecodeError basic usage."""
         error = JsonDecodeError("config.json")
         assert error.message == "Invalid JSON in config.json"
@@ -300,13 +300,13 @@ class TestJsonErrors:
         )
         assert error.error_code == "JSON_DECODE_ERROR"
 
-    def test_json_decode_error_with_position(self):
+    def test_json_decode_error_with_position(self) -> None:
         """Test JsonDecodeError with line and column."""
         error = JsonDecodeError("config.json", line=5, column=12)
         assert error.context == "Error at line 5, column 12"
         assert error.details == {"line": 5, "column": 12}
 
-    def test_json_decode_error_with_reason(self):
+    def test_json_decode_error_with_reason(self) -> None:
         """Test JsonDecodeError with reason."""
         error = JsonDecodeError("config.json", reason="Unexpected character 'x'")
         assert error.context == "Unexpected character 'x'"
@@ -315,7 +315,7 @@ class TestJsonErrors:
 class TestInternalError:
     """Test InternalError."""
 
-    def test_internal_error_basic(self):
+    def test_internal_error_basic(self) -> None:
         """Test InternalError basic usage."""
         error = InternalError("database operation")
         assert error.message == "Internal error during database operation"
@@ -326,7 +326,7 @@ class TestInternalError:
         )
         assert error.error_code == "INTERNAL_ERROR"
 
-    def test_internal_error_with_reason(self):
+    def test_internal_error_with_reason(self) -> None:
         """Test InternalError with reason."""
         error = InternalError("database operation", reason="Connection pool exhausted")
         assert error.context == "Connection pool exhausted"
