@@ -10,8 +10,16 @@ from typing import Any
 import requests
 
 from .config import get_config, save_config
-from .exceptions import AuthenticationError, ConfigurationError
+from .error_handler import handle_errors
+from .exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    JsonDecodeError,
+    NetworkError,
+)
 from .logging_config import get_logger
+from .retry import retry_on_error
+from .validation import InputValidator
 
 logger = get_logger(__name__)
 
@@ -38,6 +46,7 @@ class AuthStrategy(ABC):
     def clear_credentials(self) -> None:
         """Clear any stored credentials for the provider."""
 
+    @handle_errors("get auth data")
     def _get_auth_data(self) -> dict[str, Any]:
         """Get authentication data from config file."""
         config_data, _ = get_config()
@@ -45,6 +54,7 @@ class AuthStrategy(ABC):
         provider_data = providers.get(self.provider_name, {})
         return dict(provider_data.get("auth_data", {}))
 
+    @handle_errors("save auth data")
     def _save_auth_data(self, auth_data: dict[str, Any]) -> None:
         """Save authentication data to config file."""
         config_data, _ = get_config()
@@ -64,6 +74,7 @@ class AuthStrategy(ABC):
         save_config(config_data)
         logger.info("Successfully saved auth data for %s", self.provider_name)
 
+    @handle_errors("clear auth data")
     def _clear_auth_data(self) -> None:
         """Clear authentication data from config file."""
         config_data, _ = get_config()
@@ -78,46 +89,55 @@ class AuthStrategy(ABC):
 class ApiKeyAuth(AuthStrategy):
     """API key authentication strategy."""
 
+    @handle_errors("authenticate with API key")
     def authenticate(self) -> dict[str, Any] | None:
         """Prompt for API key and store it in config."""
         api_key = getpass.getpass(f"Enter API key for {self.provider_name}: ")
         if api_key:
-            auth_data = {"api_key": api_key}
+            # Validate the API key format if known provider
+            try:
+                validated_key = InputValidator.validate_api_key(
+                    api_key, self.provider_name
+                )
+            except Exception:
+                # If validation fails, still accept the key (for custom providers)
+                validated_key = api_key
+
+            auth_data = {"api_key": validated_key}
             self._save_auth_data(auth_data)
             logger.info("API key stored for %s", self.provider_name)
             return auth_data
         logger.warning("No API key provided for %s", self.provider_name)
         return None
 
+    @handle_errors("store API key")
     def store_api_key(self, api_key: str) -> None:
         """Store API key for the provider without prompting."""
-        auth_data = {"api_key": api_key}
+        # Validate the API key format if known provider
+        try:
+            validated_key = InputValidator.validate_api_key(api_key, self.provider_name)
+        except Exception:
+            # If validation fails, still accept the key (for custom providers)
+            validated_key = api_key
+
+        auth_data = {"api_key": validated_key}
         self._save_auth_data(auth_data)
         logger.info("API key stored for %s", self.provider_name)
 
+    @handle_errors("get API key credentials", fallback_value=None)
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored API key from config."""
-        try:
-            auth_data = self._get_auth_data()
-        except Exception:
-            logger.exception("Failed to retrieve API key for %s", self.provider_name)
-            return None
-        else:
-            if auth_data and "api_key" in auth_data:
-                logger.debug("Retrieved API key for %s", self.provider_name)
-                return auth_data
-            logger.warning("No stored API key found for %s", self.provider_name)
-            return None
+        auth_data = self._get_auth_data()
+        if auth_data and "api_key" in auth_data:
+            logger.debug("Retrieved API key for %s", self.provider_name)
+            return auth_data
+        logger.warning("No stored API key found for %s", self.provider_name)
+        return None
 
+    @handle_errors("clear API key credentials")
     def clear_credentials(self) -> None:
         """Clear stored API key from config."""
-        try:
-            self._clear_auth_data()
-        except Exception:
-            logger.exception(
-                "An unexpected error occurred while clearing API key for %s",
-                self.provider_name,
-            )
+        self._clear_auth_data()
 
 
 class DeviceFlowAuth(AuthStrategy):
@@ -150,14 +170,7 @@ class DeviceFlowAuth(AuthStrategy):
         logger.info("Starting device flow authentication for %s", self.provider_name)
 
         # Step 1: Request device code
-        try:
-            device_code_data = self._request_device_code()
-        except requests.exceptions.RequestException as e:
-            logger.exception(
-                "Network error requesting device code from %s",
-                self.provider_name,
-            )
-            raise AuthenticationError from e
+        device_code_data = self._request_device_code()
 
         logger.info("Device code obtained for %s", self.provider_name)
 
@@ -180,6 +193,8 @@ class DeviceFlowAuth(AuthStrategy):
         # Step 3: Poll for token
         return self._poll_for_token(device_code_data)
 
+    @handle_errors("request device code")
+    @retry_on_error(max_retries=3)
     def _request_device_code(self) -> dict[str, Any]:
         """Request device code from the provider."""
         headers = {"Accept": "application/json"}
@@ -188,40 +203,13 @@ class DeviceFlowAuth(AuthStrategy):
             "scope": self.scope,
         }
 
-        try:
-            response = requests.post(
-                self.device_code_url, data=data, headers=headers, timeout=30
-            )
-            response.raise_for_status()
-            return dict(response.json())
-        except requests.exceptions.JSONDecodeError as e:
-            logger.exception(
-                "Invalid response from %s device code endpoint",
-                self.provider_name,
-            )
-            raise AuthenticationError from e
-        except requests.exceptions.HTTPError as e:
-            # Check if this is a recoverable error
-            try:
-                error_info = response.json()
-                logger.exception(
-                    "HTTP error requesting device code from %s: %s",
-                    self.provider_name,
-                    error_info.get("error"),
-                )
-                raise AuthenticationError from e
-            except requests.exceptions.JSONDecodeError:
-                logger.exception(
-                    "HTTP error while polling for token from %s", self.provider_name
-                )
-                raise AuthenticationError from e
-        except requests.exceptions.RequestException as e:
-            logger.exception(
-                "Network error while polling for token from %s",
-                self.provider_name,
-            )
-            raise AuthenticationError from e
+        response = requests.post(
+            self.device_code_url, data=data, headers=headers, timeout=30
+        )
+        response.raise_for_status()
+        return dict(response.json())
 
+    @handle_errors("poll for token")
     def _poll_for_token(
         self, device_code_data: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -244,20 +232,14 @@ class DeviceFlowAuth(AuthStrategy):
                 token_data = token_response.json()
                 token_response.raise_for_status()
             except requests.exceptions.JSONDecodeError as e:
-                logger.exception(
-                    "Invalid JSON response while polling for token from %s",
-                    self.provider_name,
-                )
-                raise AuthenticationError from e
+                raise JsonDecodeError(
+                    "token response",
+                    reason=str(e),
+                ) from e
             except requests.exceptions.HTTPError as e:
                 # Check if this is a recoverable error
                 try:
-                    error_info = token_response.json()
-                    logger.exception(
-                        "HTTP error while polling for token from %s: %s",
-                        self.provider_name,
-                        error_info.get("error"),
-                    )
+                    error_info = token_data
                     error_code = error_info.get("error")
                     if error_code == "authorization_pending":
                         # This is expected, continue polling
@@ -274,24 +256,28 @@ class DeviceFlowAuth(AuthStrategy):
                         continue
                     if error_code in ("expired_token", "access_denied"):
                         # Unrecoverable error, stop polling
-                        logger.exception(
-                            "Unrecoverable error from %s: %s",
-                            self.provider_name,
-                            error_code,
-                        )
-                        msg = f"Authentication failed: {error_code}"
-                        raise AuthenticationError(msg) from e
-                except (requests.exceptions.JSONDecodeError, KeyError):
-                    logger.exception(
-                        "Unexpected error format from %s", self.provider_name
-                    )
-                    raise AuthenticationError from e
-            except requests.exceptions.RequestException as e:
-                logger.exception(
-                    "Network error while polling for token from %s",
-                    self.provider_name,
-                )
-                raise AuthenticationError from e
+                        raise AuthenticationError(
+                            f"Authentication failed: {error_code}",
+                            context=(
+                                f"OAuth device flow failed for {self.provider_name}"
+                            ),
+                            suggestion="Try authenticating again",
+                            error_code=error_code.upper(),
+                        ) from e
+                    # Unknown error
+                    raise NetworkError(
+                        "HTTP error during OAuth polling",
+                        context=str(e),
+                        suggestion="Check network connection and try again",
+                        error_code="OAUTH_POLL_ERROR",
+                    ) from e
+                except (KeyError, TypeError):
+                    raise NetworkError(
+                        "Invalid error response format",
+                        context="OAuth server returned unexpected error format",
+                        suggestion="Try authenticating again",
+                        error_code="OAUTH_ERROR_FORMAT",
+                    ) from e
 
             if "access_token" in token_data:
                 logger.info(
@@ -300,6 +286,7 @@ class DeviceFlowAuth(AuthStrategy):
                 self._save_token_info(token_data)
                 return dict(token_data)
 
+    @handle_errors("save token info")
     def _save_token_info(self, token_data: dict[str, Any]) -> None:
         """Save token information to config file."""
         # Calculate expiry time and add to token_data
@@ -308,13 +295,9 @@ class DeviceFlowAuth(AuthStrategy):
             expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
             token_data["expires_at"] = expires_at.isoformat()
 
-        try:
-            self._save_auth_data(token_data)
-        except Exception:
-            logger.exception("Failed to save token for %s", self.provider_name)
-            msg = "Could not save token information."
-            raise ConfigurationError(msg) from None
+        self._save_auth_data(token_data)
 
+    @handle_errors("get OAuth credentials", fallback_value=None)
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored token info. If expired, try to refresh."""
         token_info = self.get_token_info()
@@ -342,6 +325,8 @@ class DeviceFlowAuth(AuthStrategy):
         logger.debug("Access token for %s is still valid.", self.provider_name)
         return token_info
 
+    @handle_errors("refresh OAuth token", fallback_value=None)
+    @retry_on_error(max_retries=2)
     def _refresh_token(self) -> dict[str, Any] | None:
         """Use a refresh token to get a new access token."""
         token_info = self.get_token_info()
@@ -349,6 +334,7 @@ class DeviceFlowAuth(AuthStrategy):
             logger.warning(
                 "No refresh token found for %s. Cannot refresh.", self.provider_name
             )
+            # Return None to maintain backward compatibility
             return None
 
         logger.info("Attempting to refresh token for %s", self.provider_name)
@@ -358,48 +344,33 @@ class DeviceFlowAuth(AuthStrategy):
             "grant_type": "refresh_token",
         }
         headers = {"Accept": "application/json"}
-        try:
-            response = requests.post(
-                self.token_url, data=payload, headers=headers, timeout=30
-            )
-            response.raise_for_status()
-            new_token_data = response.json()
-        except requests.exceptions.RequestException:
-            logger.exception(
-                "Failed to refresh token for %s. Re-authentication will be required.",
-                self.provider_name,
-            )
-            self.clear_credentials()
-            return None
-        else:
-            if "refresh_token" not in new_token_data:
-                new_token_data["refresh_token"] = token_info["refresh_token"]
 
-            self._save_token_info(new_token_data)
-            logger.info("Successfully refreshed token for %s", self.provider_name)
-            return dict(new_token_data)
+        response = requests.post(
+            self.token_url, data=payload, headers=headers, timeout=30
+        )
+        response.raise_for_status()
+        new_token_data = response.json()
 
+        if "refresh_token" not in new_token_data:
+            new_token_data["refresh_token"] = token_info["refresh_token"]
+
+        self._save_token_info(new_token_data)
+        logger.info("Successfully refreshed token for %s", self.provider_name)
+        return dict(new_token_data)
+
+    @handle_errors("get token info", fallback_value=None)
     def get_token_info(self) -> dict[str, Any] | None:
         """Retrieve token information from config file."""
-        try:
-            auth_data = self._get_auth_data()
-        except Exception:
-            logger.exception("Could not retrieve token for %s", self.provider_name)
-            return None
-        else:
-            return auth_data if auth_data else None
+        auth_data = self._get_auth_data()
+        return auth_data if auth_data else None
 
+    @handle_errors("clear OAuth credentials")
     def clear_credentials(self) -> None:
         """Clear stored token from config file."""
-        try:
-            self._clear_auth_data()
-        except Exception:
-            logger.exception(
-                "An unexpected error occurred while clearing token for %s",
-                self.provider_name,
-            )
+        self._clear_auth_data()
 
 
+@handle_errors("get auth strategy")
 def get_auth_strategy(
     provider_name: str,
     provider_data: dict[str, Any],
@@ -420,8 +391,12 @@ def get_auth_strategy(
         ConfigurationError: If the provider is not found or misconfigured.
     """
     if not provider_data:
-        msg = f"Provider '{provider_name}' not found in configuration."
-        raise ConfigurationError(msg)
+        raise ConfigurationError(
+            f"Provider '{provider_name}' not found",
+            context="Provider configuration is missing",
+            suggestion=f"Add provider '{provider_name}' to your configuration",
+            error_code="PROVIDER_NOT_CONFIGURED",
+        )
 
     strategy_name = provider_data.get("auth_strategy")
     if not strategy_name:
@@ -434,7 +409,10 @@ def get_auth_strategy(
         auth_details = provider_data.get("auth_details")
         if not auth_details:
             raise ConfigurationError(
-                f"Provider '{provider_name}' is missing required device flow settings."
+                f"Device flow settings missing for '{provider_name}'",
+                context="OAuth device flow requires client_id, URLs, and scope",
+                suggestion="Check provider configuration for missing auth_details",
+                error_code="DEVICE_FLOW_MISCONFIGURED",
             )
 
         return DeviceFlowAuth(
@@ -446,10 +424,18 @@ def get_auth_strategy(
         )
 
     raise ConfigurationError(
-        f"Unknown auth strategy '{strategy_name}' for provider '{provider_name}'."
+        f"Unknown auth strategy '{strategy_name}'",
+        context=(
+            f"Provider '{provider_name}' uses an unsupported authentication method"
+        ),
+        suggestion=(
+            "Supported strategies: 'api_key', 'device_flow', or omit for no auth"
+        ),
+        error_code="UNKNOWN_AUTH_STRATEGY",
     )
 
 
+@handle_errors("get credentials", fallback_value=None)
 def get_credentials(
     provider_name: str,
     model_alias: str,
@@ -465,27 +451,17 @@ def get_credentials(
     if verbose:
         logger.setLevel("DEBUG")
 
-    try:
-        strategy = get_auth_strategy(provider_name, provider_data, model_alias)
-        creds = strategy.get_credentials()
-        if creds:
-            logger.info("Successfully retrieved credentials for %s", provider_name)
-            return creds
+    strategy = get_auth_strategy(provider_name, provider_data, model_alias)
+    creds = strategy.get_credentials()
+    if creds:
+        logger.info("Successfully retrieved credentials for %s", provider_name)
+        return creds
 
-        logger.info(
-            "No valid credentials found for %s. Initiating authentication.",
-            provider_name,
-        )
-        return strategy.authenticate()
-
-    except (ConfigurationError, AuthenticationError):
-        logger.exception("Authentication failed for %s", provider_name)
-        return None
-    except Exception:
-        logger.exception(
-            "An unexpected error occurred during authentication for %s", provider_name
-        )
-        return None
+    logger.info(
+        "No valid credentials found for %s. Initiating authentication.",
+        provider_name,
+    )
+    return strategy.authenticate()
 
 
 class NoAuth(AuthStrategy):

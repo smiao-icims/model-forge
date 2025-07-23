@@ -19,14 +19,16 @@ except ImportError:
 
 # Local imports
 from . import auth, config
-from .exceptions import ConfigurationError, ModelNotFoundError, ProviderError
+from .error_handler import handle_errors
+from .exceptions import (
+    ConfigurationError,
+    InvalidApiKeyError,
+    ModelNotFoundError,
+    ProviderError,
+    ProviderNotAvailableError,
+)
 from .logging_config import get_logger
-
-
-def _raise_provider_error(message: str) -> None:
-    """Raise a ProviderError with the given message."""
-    raise ProviderError(message)
-
+from .validation import InputValidator
 
 logger = get_logger(__name__)
 
@@ -67,11 +69,12 @@ class ModelForgeRegistry:
             )
             current_model = config.get_current_model()
             if not current_model:
-                msg = (
-                    "No model selected. Use 'modelforge config use' "
-                    "or provide provider and model."
+                raise ConfigurationError(
+                    "No model selected",
+                    context="No provider or model specified and no default configured",
+                    suggestion="Use 'modelforge config use' to set a default model",
+                    error_code="NO_MODEL_SELECTED",
                 )
-                raise ConfigurationError(msg)
             provider_name = current_model.get("provider")
             model_alias = current_model.get("model")
             logger.debug(
@@ -81,18 +84,32 @@ class ModelForgeRegistry:
             )
 
         if not provider_name or not model_alias:
-            msg = "Could not determine provider and model to use."
-            raise ConfigurationError(msg)
+            raise ConfigurationError(
+                "Could not determine provider and model",
+                context="Configuration may be corrupted",
+                suggestion="Check your configuration file or reconfigure",
+                error_code="INVALID_CONFIG",
+            )
 
         provider_data = self._config.get("providers", {}).get(provider_name)
         if not provider_data:
-            msg = f"Provider '{provider_name}' not found in configuration"
-            raise ProviderError(msg)
+            available_providers = list(self._config.get("providers", {}).keys())
+            raise ProviderNotAvailableError(
+                provider_name,
+                (
+                    f"Provider not found in configuration. "
+                    f"Available: {', '.join(available_providers)}"
+                ),
+            )
 
         model_data = provider_data.get("models", {}).get(model_alias)
         if model_data is None:
-            msg = f"Model '{model_alias}' not found for provider '{provider_name}'"
-            raise ModelNotFoundError(msg)
+            available_models = list(provider_data.get("models", {}).keys())
+            raise ModelNotFoundError(
+                provider_name,
+                model_alias,
+                available_models,
+            )
 
         logger.debug(
             "Successfully retrieved config for provider='%s' and model='%s'",
@@ -101,6 +118,7 @@ class ModelForgeRegistry:
         )
         return provider_name, model_alias, provider_data, model_data
 
+    @handle_errors("get LLM instance")
     def get_llm(
         self, provider_name: str | None = None, model_alias: str | None = None
     ) -> BaseChatModel:
@@ -116,57 +134,57 @@ class ModelForgeRegistry:
             ProviderError: If the provider is not supported or credentials are missing.
             ModelNotFoundError: If the specified model is not found.
         """
+        # Validate inputs if provided
+        if provider_name:
+            provider_name = InputValidator.validate_provider_name(provider_name)
+        if model_alias:
+            model_alias = InputValidator.validate_model_name(model_alias)
+
         resolved_provider = provider_name
         resolved_model = model_alias
-        try:
-            (
-                resolved_provider,
-                resolved_model,
-                provider_data,
-                model_data,
-            ) = self._get_model_config(resolved_provider, resolved_model)
 
-            llm_type = provider_data.get("llm_type")
-            if not llm_type:
-                _raise_provider_error(
-                    f"Provider '{resolved_provider}' has no 'llm_type' configured."
-                )
+        (
+            resolved_provider,
+            resolved_model,
+            provider_data,
+            model_data,
+        ) = self._get_model_config(resolved_provider, resolved_model)
 
-            logger.info(
-                "Creating LLM instance for provider: %s, model: %s",
-                resolved_provider,
-                resolved_model,
+        llm_type = provider_data.get("llm_type")
+        if not llm_type:
+            raise ConfigurationError(
+                f"Provider '{resolved_provider}' has no 'llm_type' configured",
+                context="Missing required configuration field",
+                suggestion="Check provider configuration in config file",
+                error_code="MISSING_LLM_TYPE",
             )
 
-            # Factory mapping for LLM creation
-            creator_map = {
-                "ollama": self._create_ollama_llm,
-                "google_genai": self._create_google_genai_llm,
-                "openai_compatible": self._create_openai_compatible_llm,
-                "github_copilot": self._create_github_copilot_llm,
-            }
+        logger.info(
+            "Creating LLM instance for provider: %s, model: %s",
+            resolved_provider,
+            resolved_model,
+        )
 
-            creator = creator_map.get(str(llm_type))
-            if not creator:
-                _raise_provider_error(
-                    f"Unsupported llm_type '{llm_type}' for provider "
-                    f"'{resolved_provider}'"
-                )
+        # Factory mapping for LLM creation
+        creator_map = {
+            "ollama": self._create_ollama_llm,
+            "google_genai": self._create_google_genai_llm,
+            "openai_compatible": self._create_openai_compatible_llm,
+            "github_copilot": self._create_github_copilot_llm,
+        }
 
-            return creator(resolved_provider, resolved_model, provider_data, model_data)  # type: ignore[misc]
-
-        except (ConfigurationError, ProviderError, ModelNotFoundError):
-            logger.exception("Failed to create LLM")
-            raise
-        except Exception as e:
-            logger.exception(
-                "An unexpected error occurred while creating LLM instance for %s/%s",
-                resolved_provider,
-                resolved_model,
+        creator = creator_map.get(str(llm_type))
+        if not creator:
+            raise ProviderError(
+                f"Unsupported llm_type '{llm_type}'",
+                context=f"Provider '{resolved_provider}' uses an unknown LLM type",
+                suggestion=f"Supported types: {', '.join(creator_map.keys())}",
+                error_code="UNSUPPORTED_LLM_TYPE",
             )
-            msg = "An unexpected error occurred during LLM creation."
-            raise ProviderError(msg) from e
 
+        return creator(resolved_provider, resolved_model, provider_data, model_data)
+
+    @handle_errors("create OpenAI-compatible LLM")
     def _create_openai_compatible_llm(
         self,
         provider_name: str,
@@ -181,13 +199,11 @@ class ModelForgeRegistry:
             provider_name, model_alias, provider_data, verbose=self.verbose
         )
         if not credentials:
-            msg = f"Could not retrieve credentials for provider: {provider_name}"
-            raise ProviderError(msg)
+            raise InvalidApiKeyError(provider_name)
 
         api_key = credentials.get("access_token") or credentials.get("api_key")
         if not api_key:
-            msg = f"Could not find token or key for provider: {provider_name}"
-            raise ProviderError(msg)
+            raise InvalidApiKeyError(provider_name)
 
         actual_model_name = model_data.get("api_model_name", model_alias)
         base_url = provider_data.get("base_url")
@@ -201,6 +217,7 @@ class ModelForgeRegistry:
 
         return ChatOpenAI(model=actual_model_name, api_key=api_key, base_url=base_url)
 
+    @handle_errors("create Ollama LLM")
     def _create_ollama_llm(
         self,
         provider_name: str,  # noqa: ARG002
@@ -211,13 +228,21 @@ class ModelForgeRegistry:
         """Create ChatOllama instance."""
         base_url = provider_data.get("base_url", os.getenv("OLLAMA_HOST"))
         if not base_url:
-            msg = (
-                "Ollama 'base_url' not set in config and "
-                "OLLAMA_HOST env var is not set."
+            raise ConfigurationError(
+                "Ollama base URL not configured",
+                context=(
+                    "Neither 'base_url' in config nor OLLAMA_HOST "
+                    "environment variable is set"
+                ),
+                suggestion=(
+                    "Set OLLAMA_HOST environment variable or add "
+                    "'base_url' to provider config"
+                ),
+                error_code="OLLAMA_URL_MISSING",
             )
-            raise ConfigurationError(msg)
         return ChatOllama(model=model_alias, base_url=base_url)
 
+    @handle_errors("create GitHub Copilot LLM")
     def _create_github_copilot_llm(
         self,
         provider_name: str,
@@ -227,18 +252,16 @@ class ModelForgeRegistry:
     ) -> BaseChatModel:
         """Create a ChatGitHubCopilot instance."""
         if not GITHUB_COPILOT_AVAILABLE:
-            msg = (
-                "GitHub Copilot libraries not installed. "
-                "Please run 'poetry install --extras github-copilot'"
+            raise ProviderNotAvailableError(
+                provider_name,
+                "GitHub Copilot libraries not installed",
             )
-            raise ProviderError(msg)
 
         credentials = auth.get_credentials(
             provider_name, model_alias, provider_data, verbose=self.verbose
         )
         if not credentials or "access_token" not in credentials:
-            msg = f"Could not get valid credentials for {provider_name}"
-            raise ProviderError(msg)
+            raise InvalidApiKeyError(provider_name)
 
         copilot_token = credentials["access_token"]
         actual_model_name = model_data.get("api_model_name", model_alias)
@@ -251,6 +274,7 @@ class ModelForgeRegistry:
 
         return ChatGitHubCopilot(api_key=copilot_token, model=actual_model_name)
 
+    @handle_errors("create Google Generative AI LLM")
     def _create_google_genai_llm(
         self,
         provider_name: str,
@@ -263,8 +287,7 @@ class ModelForgeRegistry:
             provider_name, model_alias, provider_data, verbose=self.verbose
         )
         if not credentials or "api_key" not in credentials:
-            msg = f"API key not found for {provider_name}"
-            raise ProviderError(msg)
+            raise InvalidApiKeyError(provider_name)
 
         api_key = credentials["api_key"]
         actual_model_name = model_data.get("api_model_name", model_alias)

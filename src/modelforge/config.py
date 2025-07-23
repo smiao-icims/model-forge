@@ -4,8 +4,14 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .exceptions import ConfigurationError
+from .error_handler import handle_errors
+from .exceptions import (
+    ConfigurationNotFoundError,
+    FileValidationError,
+    JsonDecodeError,
+)
 from .logging_config import get_logger
+from .validation import InputValidator
 
 logger = get_logger(__name__)
 
@@ -66,11 +72,18 @@ def get_config_from_path(path: Path) -> tuple[dict[str, Any], Path]:
             logger.debug("Successfully loaded configuration from: %s", path)
             return config_data, path
     except json.JSONDecodeError as e:
-        logger.exception("Invalid JSON in configuration file %s", path)
-        raise ConfigurationError from e
+        raise JsonDecodeError(
+            f"configuration file {path}",
+            line=e.lineno,
+            column=e.colno,
+            reason=e.msg,
+        ) from e
     except OSError as e:
-        logger.exception("Could not read configuration file %s", path)
-        raise ConfigurationError from e
+        raise FileValidationError(
+            str(path),
+            f"Cannot read configuration file: {e}",
+            suggestion="Check file permissions or create a new configuration",
+        ) from e
 
 
 def save_config(config_data: dict[str, Any], local: bool = False) -> None:
@@ -93,10 +106,14 @@ def save_config(config_data: dict[str, Any], local: bool = False) -> None:
             json.dump(config_data, f, indent=4)
         logger.debug("Successfully saved configuration to: %s", config_path)
     except OSError as e:
-        logger.exception("Could not save config file to %s", config_path)
-        raise ConfigurationError from e
+        raise FileValidationError(
+            str(config_path),
+            f"Cannot write configuration file: {e}",
+            suggestion="Check directory permissions or disk space",
+        ) from e
 
 
+@handle_errors("set current model")
 def set_current_model(provider: str, model: str, local: bool = False) -> bool:
     """
     Set the current model for the given provider.
@@ -107,8 +124,16 @@ def set_current_model(provider: str, model: str, local: bool = False) -> bool:
         local: If True, modifies the local configuration
 
     Returns:
-        True if successful, False otherwise
+        True if successful
+
+    Raises:
+        ConfigurationNotFoundError: If provider or model not found
+        ConfigurationValidationError: If configuration is invalid
     """
+    # Validate inputs
+    provider = InputValidator.validate_provider_name(provider)
+    model = InputValidator.validate_model_name(model)
+
     # When setting a model, we should read from the specific config file,
     # not the merged one.
     target_config_path = get_config_path(local=local)
@@ -117,20 +142,17 @@ def set_current_model(provider: str, model: str, local: bool = False) -> bool:
     # Check if provider and model exist in the configuration
     providers = config_data.get("providers", {})
     if provider not in providers:
-        scope = "local" if local else "global"
-        print(f"Error: Provider '{provider}' not found in {scope} configuration.")
-        print("Please add it using 'modelforge config add' first.")
-        return False
+        raise ConfigurationNotFoundError(
+            provider,
+            model,
+        )
 
     models = providers[provider].get("models", {})
     if model not in models:
-        scope = "local" if local else "global"
-        print(
-            f"Error: Model '{model}' for provider '{provider}' not found "
-            f"in {scope} configuration."
+        raise ConfigurationNotFoundError(
+            provider,
+            model,
         )
-        print("Please add it using 'modelforge config add' first.")
-        return False
 
     # Set the current model
     config_data["current_model"] = {"provider": provider, "model": model}
@@ -156,6 +178,7 @@ def get_current_model() -> dict[str, str] | None:
     return config_data.get("current_model")
 
 
+@handle_errors("migrate configuration")
 def migrate_old_config() -> None:
     """
     Migrate configuration from the old location to the new global location.
@@ -167,45 +190,40 @@ def migrate_old_config() -> None:
     old_config_file = Path.home() / ".config" / "model-forge" / "models.json"
 
     if old_config_file.exists():
-        try:
-            # Read old configuration
-            with old_config_file.open() as f:
-                old_config_data = json.load(f)
+        # Read old configuration
+        with old_config_file.open() as f:
+            old_config_data = json.load(f)
 
-            # Check if new configuration already exists
-            if not GLOBAL_CONFIG_FILE.exists():
-                # Create new config directory
-                GLOBAL_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        # Check if new configuration already exists
+        if not GLOBAL_CONFIG_FILE.exists():
+            # Create new config directory
+            GLOBAL_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-                # Write old data to new location
-                with GLOBAL_CONFIG_FILE.open("w") as f:
-                    json.dump(old_config_data, f, indent=4)
+            # Write old data to new location
+            with GLOBAL_CONFIG_FILE.open("w") as f:
+                json.dump(old_config_data, f, indent=4)
 
-                logger.info(
-                    "Migrated configuration from %s to %s",
-                    old_config_file,
-                    GLOBAL_CONFIG_FILE,
-                )
-                print(f"Configuration migrated from {old_config_file}")
-                print(f"  to: {GLOBAL_CONFIG_FILE}")
-                print("You can safely delete the old file if migration was successful.")
+            logger.info(
+                "Migrated configuration from %s to %s",
+                old_config_file,
+                GLOBAL_CONFIG_FILE,
+            )
+            print(f"Configuration migrated from {old_config_file}")
+            print(f"  to: {GLOBAL_CONFIG_FILE}")
+            print("You can safely delete the old file if migration was successful.")
 
-            else:
-                logger.info(
-                    "Old configuration file found, but new global configuration "
-                    "already exists"
-                )
-                print(
-                    "Old configuration file found, but a new global configuration "
-                    "already exists."
-                )
-                print(f"  - Old: {old_config_file}")
-                print(f"  - New: {GLOBAL_CONFIG_FILE}")
-                print("Please manually review and merge if needed.")
-
-        except Exception as e:
-            logger.exception("Error during configuration migration")
-            print(f"Error during migration: {e}")
+        else:
+            logger.info(
+                "Old configuration file found, but new global configuration "
+                "already exists"
+            )
+            print(
+                "Old configuration file found, but a new global configuration "
+                "already exists."
+            )
+            print(f"  - Old: {old_config_file}")
+            print(f"  - New: {GLOBAL_CONFIG_FILE}")
+            print("Please manually review and merge if needed.")
     else:
         print("No old configuration file found to migrate.")
         print(f"Looking for: {old_config_file}")
