@@ -130,6 +130,11 @@ poetry run modelforge test --prompt "Hello world"
 - **src/modelforge/auth.py**: Authentication strategies and credential management
 - **src/modelforge/cli.py**: Click-based CLI for configuration management
 - **src/modelforge/modelsdev.py**: models.dev API integration with caching
+- **src/modelforge/exceptions.py**: Comprehensive exception hierarchy with context and suggestions
+- **src/modelforge/error_handler.py**: Error handling decorator with fallback support
+- **src/modelforge/retry.py**: Retry mechanism with exponential backoff
+- **src/modelforge/validation.py**: Input validation utilities
+- **src/modelforge/cli_utils.py**: CLI error formatting and utilities
 
 ## Spec-Driven TDD Development 🎯
 
@@ -147,8 +152,8 @@ specs/
 ├── enhancements/               # Feature additions
 │   ├── distribution-packaging/ # PyPI packaging (✅ COMPLETED)
 │   ├── modelsdev-integration/  # models.dev API (✅ COMPLETED)
-│   ├── uv-migration/          # UV package manager
-│   └── error-handling-improvements/
+│   ├── error-handling-improvements/ # Error handling (✅ IN PROGRESS)
+│   └── uv-migration/          # UV package manager
 ├── security-credentials-refactor/
 ├── testing-improvements/
 └── type-safety-refactor/
@@ -254,7 +259,14 @@ def test_spec_task_001_basic_functionality():
 - **modelsdev-integration**: models.dev API integration
 
 #### **🔄 IN PROGRESS**
-- **error-handling-improvements**: Comprehensive error handling (requirements.md ready)
+- **error-handling-improvements**: Comprehensive error handling (70% complete)
+  - ✅ Exception hierarchy with context and suggestions
+  - ✅ Error handler decorator with fallback values
+  - ✅ Retry mechanism with exponential backoff
+  - ✅ Input validation framework
+  - ✅ CLI error formatting
+  - ✅ Updated config.py, auth.py, registry.py
+  - 🔄 Pending: cli.py and modelsdev.py updates
 
 #### **📋 BACKLOG**
 - **uv-migration**: Switch to UV package manager
@@ -644,6 +656,162 @@ For critical production issues:
 - **README updates**: Document new features
 - **Changelog**: Track spec-driven changes
 
+## Error Handling Framework (✅ 70% Complete)
+
+### 🎯 Overview
+
+ModelForge now has a comprehensive error handling framework that provides:
+- **Clear, actionable error messages** with context and suggestions
+- **Automatic retry** for transient network issues
+- **Input validation** before operations
+- **Consistent error formatting** across CLI and library
+
+### 🏗️ Architecture
+
+#### Exception Hierarchy
+```python
+ModelForgeError  # Base exception with context, suggestion, error_code
+├── ConfigurationError
+│   ├── ConfigurationNotFoundError
+│   └── ConfigurationValidationError
+├── AuthenticationError
+│   ├── InvalidApiKeyError
+│   └── TokenExpiredError
+├── NetworkError
+│   ├── NetworkTimeoutError
+│   └── RateLimitError
+├── ProviderError
+│   ├── ModelNotFoundError
+│   └── ProviderNotAvailableError
+├── ValidationError
+│   ├── InvalidInputError
+│   └── FileValidationError
+├── JsonError
+│   └── JsonDecodeError
+└── InternalError
+```
+
+#### Key Components
+
+1. **Error Handler Decorator** (`@handle_errors`)
+   ```python
+   @handle_errors("operation name", fallback_value=None)
+   def risky_operation():
+       # Automatically catches and converts exceptions
+   ```
+
+2. **Retry Mechanism** (`@retry_on_error`)
+   ```python
+   @retry_on_error(max_retries=3, backoff_factor=2.0)
+   def network_operation():
+       # Automatically retries on NetworkTimeoutError, RateLimitError
+   ```
+
+3. **Input Validation** (`InputValidator`)
+   ```python
+   # Validates before operations to prevent errors
+   provider = InputValidator.validate_provider_name(provider)
+   api_key = InputValidator.validate_api_key(api_key, provider)
+   ```
+
+4. **CLI Error Formatting** (`ErrorFormatter`)
+   ```python
+   # Beautiful error display with colors and suggestions
+   @handle_cli_errors
+   def cli_command(ctx):
+       # Errors are automatically formatted for users
+   ```
+
+### 📝 Usage Examples
+
+#### Creating Custom Exceptions
+```python
+raise ConfigurationNotFoundError(
+    "openai",
+    "gpt-4",
+    context="Provider not found in configuration",
+    suggestion="Run 'modelforge config add --provider openai'"
+)
+```
+
+#### Adding Error Handling to Functions
+```python
+@handle_errors("load configuration", fallback_value={})
+def load_config():
+    # Exceptions are caught and logged
+    # Returns {} on error instead of crashing
+```
+
+#### Network Operations with Retry
+```python
+@handle_errors("API call")
+@retry_on_error(max_retries=3)
+def call_api():
+    # Retries up to 3 times with exponential backoff
+    # Honors Retry-After headers for rate limits
+```
+
+### 🧪 Testing Error Scenarios
+
+All error handling components have comprehensive tests:
+- `tests/test_exceptions.py` - Exception hierarchy tests
+- `tests/test_error_handler.py` - Error handler decorator tests
+- `tests/test_retry.py` - Retry mechanism tests
+- `tests/test_validation.py` - Input validation tests
+- `tests/test_cli_utils.py` - CLI formatting tests
+
+### 🔄 Migration Guide
+
+When updating code to use the new error handling:
+
+1. **Replace generic exceptions**:
+   ```python
+   # Old
+   raise ValueError(f"Provider {name} not found")
+
+   # New
+   raise ProviderNotAvailableError(
+       name,
+       "Provider not found in configuration"
+   )
+   ```
+
+2. **Add error handling decorators**:
+   ```python
+   # Old
+   def risky_operation():
+       try:
+           # code
+       except Exception as e:
+           logger.error(f"Error: {e}")
+           raise
+
+   # New
+   @handle_errors("risky operation")
+   def risky_operation():
+       # code
+   ```
+
+3. **Add input validation**:
+   ```python
+   # Old
+   def add_provider(name, api_key):
+       # direct use
+
+   # New
+   def add_provider(name, api_key):
+       name = InputValidator.validate_provider_name(name)
+       api_key = InputValidator.validate_api_key(api_key, name)
+       # validated use
+   ```
+
+### 📊 Progress Status
+
+- ✅ **Completed**: Exception hierarchy, error handler, retry mechanism, validation, CLI formatting
+- ✅ **Updated Modules**: config.py, auth.py, registry.py
+- 🔄 **In Progress**: Updating remaining modules (cli.py, modelsdev.py)
+- 📋 **Next Steps**: Complete module updates, add telemetry hooks, create error reference docs
+
 ## PyPI Distribution & Version Management (✅ Completed)
 
 ### 🚀 Proper Release Workflow (Step-by-Step)
@@ -775,8 +943,30 @@ Tests use pytest with coverage. Key test files:
 - `tests/test_auth.py` - Authentication strategies
 - `tests/test_registry.py` - LLM factory and provider integration
 
-### Testing Learnings from CI/CD Implementation
+### Testing Best Practices
 - **Parameter naming**: Tests must match actual library API (e.g., `model` vs `model_name`)
 - **Mock assertions**: Use exact parameter names from actual constructors
 - **Test isolation**: Each test should be independent and not rely on global state
 - **Coverage**: Aim for >80% coverage with meaningful test cases
+- **Type annotations**: All test methods should have `-> None` return type annotations
+- **Mock parameters**: Use `Any` type for mock objects in test signatures
+
+### Test Configuration
+
+The project uses ruff with relaxed rules for test files:
+
+```toml
+# pyproject.toml
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "ANN401",  # Allow Any type in tests (common for mocks)
+    "S101",    # Allow assert in tests
+    "S108",    # Allow hardcoded temp paths in tests
+    "PT019",   # Allow pytest fixtures without value
+    "PLR2004", # Allow magic value comparison in tests
+    "TRY002",  # Allow custom exceptions in tests
+    "ARG001",  # Allow unused function arguments (test fixtures)
+    "PLR0913", # Allow many arguments in test functions
+    "E501",    # Allow longer lines in tests (for assertions)
+]
+```
