@@ -214,4 +214,9 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
+[dependency-groups]
+dev = [
+    "build>=1.2.2.post1",
+]
+
 # Removed Poetry-specific sections - now using uv
