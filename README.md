@@ -2,6 +2,12 @@
 
 A Python library for managing LLM providers, authentication, and model selection with seamless LangChain integration.
 
+[![PyPI version](https://badge.fury.io/py/model-forge-llm.svg)](https://badge.fury.io/py/model-forge-llm)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**🚀 Version 1.0.0 - Production Ready!**
+
 ## Installation
 
 ### Recommended: Virtual Environment
@@ -237,9 +243,20 @@ For contributors and developers:
 ```bash
 git clone https://github.com/smiao-icims/model-forge.git
 cd model-forge
-poetry install
-poetry run pytest
+
+# Quick setup with uv (recommended)
+./setup.sh
+
+# Or manual setup
+uv sync --extra dev
+uv run pytest
 ```
+
+**Requirements:**
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (modern Python package manager)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
 
 ## Documentation
 

@@ -4,20 +4,37 @@ Thank you for your interest in contributing to ModelForge! This guide will help 
 
 ## Development Setup
 
+### Prerequisites
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (modern Python package manager)
+
+### Setup Steps
+
 1. **Fork and clone the repository**
    ```bash
    git clone https://github.com/your-username/model-forge.git
    cd model-forge
    ```
 
-2. **Set up development environment**
+2. **Set up development environment** (automated)
    ```bash
-   ./setup.sh --skip-tests
+   ./setup.sh
    ```
 
-3. **Install pre-commit hooks**
+   Or manually:
    ```bash
-   poetry run pre-commit install
+   # Install uv (if not already installed)
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Install dependencies and setup pre-commit
+   uv sync --extra dev
+   uv run pre-commit install
+   ```
+
+3. **Verify setup**
+   ```bash
+   uv run modelforge --help
+   uv run pytest tests/ -v
    ```
 
 ## Code Quality
@@ -40,19 +57,29 @@ We maintain comprehensive code review standards:
 
 ```bash
 # Format code
-poetry run ruff format .
+uv run ruff format .
 
 # Check linting
-poetry run ruff check .
+uv run ruff check .
 
 # Type checking
-poetry run mypy src/modelforge
+uv run mypy src/modelforge
 
-# Run tests
-poetry run pytest
+# Run tests with coverage
+uv run pytest --cov=src/modelforge
 
-# Run all checks
-poetry run pre-commit run --all-files
+# Run all checks (recommended before committing)
+uv run pre-commit run --all-files
+```
+
+### Pre-commit Workflow
+
+Before every commit, run this sequence:
+```bash
+uv run ruff format .
+uv run ruff check .
+uv run mypy src/modelforge --ignore-missing-imports
+uv run pytest --cov=src/modelforge
 ```
 
 ## Making Changes
@@ -70,9 +97,9 @@ poetry run pre-commit run --all-files
 
 3. **Test your changes**
    ```bash
-   poetry run pytest
-   poetry run mypy src/modelforge
-   poetry run ruff check .
+   uv run pytest --cov=src/modelforge
+   uv run mypy src/modelforge --ignore-missing-imports
+   uv run ruff check .
    ```
 
 4. **Commit your changes**

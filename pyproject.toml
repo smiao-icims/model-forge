@@ -119,6 +119,7 @@ exclude = [
 # Per-file ignores for test files
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
+    "ANN101",  # Allow missing type annotation for self in method
     "ANN401",  # Allow Any type in tests (common for mocks)
     "S101",    # Allow assert in tests
     "S108",    # Allow hardcoded temp paths in tests

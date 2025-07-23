@@ -4,6 +4,7 @@ from typing import Any
 from unittest.mock import patch
 
 import click
+from click.testing import CliRunner
 
 from modelforge.cli_utils import (
     ErrorFormatter,
@@ -129,7 +130,6 @@ class TestHandleCliErrors:
 
     def test_handle_cli_errors_integration(self) -> None:
         """Test handle_cli_errors with a real Click command."""
-        from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors
@@ -152,7 +152,6 @@ class TestHandleCliErrors:
 
     def test_keyboard_interrupt_handling(self) -> None:
         """Test handling of keyboard interrupt."""
-        from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors
@@ -167,7 +166,6 @@ class TestHandleCliErrors:
 
     def test_click_exception_passthrough(self) -> None:
         """Test that Click exceptions pass through properly."""
-        from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors
@@ -183,7 +181,6 @@ class TestHandleCliErrors:
 
     def test_verbose_and_debug_modes(self) -> None:
         """Test verbose and debug mode error formatting."""
-        from click.testing import CliRunner
 
         @click.command()
         @handle_cli_errors

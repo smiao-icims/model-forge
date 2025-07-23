@@ -2,15 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**🚀 ModelForge 1.0.0 - Production Ready with uv Package Manager**
+
 ## Quick Start
 
 ```bash
-# Setup development environment
+# Setup development environment with uv (modern, fast)
 ./setup.sh
 
-# Quick usage via wrapper script
-./modelforge.sh config show
-./modelforge.sh config add --provider openai --model gpt-4o-mini --api-key "YOUR_KEY"
+# Quick usage with uv
+uv run modelforge config show
+uv run modelforge config add --provider openai --model gpt-4o-mini --api-key "YOUR_KEY"
 ```
 
 ## Core Architecture
@@ -21,42 +23,42 @@ ModelForge is a Python library for managing LLM providers with three main compon
 - **auth**: Authentication strategies (API key, OAuth device flow, no-op for local models)
 - **registry**: Factory that creates LangChain-compatible LLM instances from configuration
 
-## Distribution Packaging (✅ Completed)
+## Distribution Packaging (✅ 1.0.0 Release Ready)
 
-The project now has complete distribution packaging:
+The project has modern, production-ready distribution packaging:
 
-- **pyproject.toml**: Modern Python packaging with setuptools backend
-- **MANIFEST.in**: Proper package data inclusion and exclusion rules
-- **Build system**: Poetry-based with `poetry build` for wheel and sdist
-- **Validation**: Twine checks pass for both formats
-- **Installation**: Successfully installs via pip from wheel
+- **pyproject.toml**: PEP 621 compliant configuration with setuptools backend
+- **uv.lock**: Reproducible dependency resolution with uv package manager
+- **Build system**: Modern uv-based with GitHub Actions automation
+- **PyPI**: Published as `model-forge-llm` package
 - **CLI**: Entry point `modelforge` command works correctly
+- **Testing**: Comprehensive test suite with >90% coverage
 
 Build commands:
 ```bash
-poetry build                    # Build wheel and sdist
-poetry run twine check dist/*   # Validate packages
-poetry run pip install dist/*.whl  # Test installation
+uv run python -m build          # Build wheel and sdist
+uv run twine check dist/*       # Validate packages
+pip install dist/*.whl          # Test installation
 ```
 
 ## Core Development Workflow
 
-### 🔄 Developer Workflow (New Python Developers)
+### 🔄 Developer Workflow (uv-based)
 
 **Before every commit, run this exact sequence:**
 
 ```bash
 # 1. Format code (fixes 90% of issues automatically)
-poetry run ruff format .
+uv run ruff format .
 
 # 2. Check for linting issues
-poetry run ruff check .
+uv run ruff check .
 
 # 3. Type checking (catches subtle bugs)
-poetry run mypy src/modelforge --ignore-missing-imports
+uv run mypy src/modelforge --ignore-missing-imports
 
 # 4. Run all tests with coverage
-poetry run pytest --cov=src/modelforge
+uv run pytest --cov=src/modelforge
 
 # 5. If all pass, you're ready to commit!
 git add .
@@ -68,59 +70,63 @@ git commit -m "your message"
 - **ruff check**: Finds code smells and style issues
 - **mypy**: Type checking - catches bugs before runtime
 - **pytest**: Runs all tests and shows coverage
+- **uv**: Modern Python package manager (faster than pip/poetry)
 
 ### 🚨 Common Developer Mistakes & Fixes
 
 **Problem: CI fails with "line too long"**
 ```bash
 # Fix: ruff format will auto-wrap lines
-poetry run ruff format .
+uv run ruff format .
 ```
 
 **Problem: CI fails with "undefined variable"**
 ```bash
 # Fix: mypy catches these - check the error message
-poetry run mypy src/modelforge --ignore-missing-imports
+uv run mypy src/modelforge --ignore-missing-imports
 ```
 
 **Problem: Test fails with "assertion error"**
 ```bash
 # Fix: Run tests locally to see detailed failure
-poetry run pytest tests/test_specific_file.py -v
+uv run pytest tests/test_specific_file.py -v
 ```
 
 ### 🎯 Quick Fix Commands
 
 ```bash
 # Fix everything in one go
-poetry run ruff format . && poetry run ruff check --fix . && poetry run mypy src/modelforge --ignore-missing-imports
+uv run ruff format . && uv run ruff check --fix . && uv run mypy src/modelforge --ignore-missing-imports
 
 # Run specific test file
-poetry run pytest tests/test_registry.py -v
+uv run pytest tests/test_registry.py -v
 
 # See coverage report
-poetry run pytest --cov=src/modelforge --cov-report=html
+uv run pytest --cov=src/modelforge --cov-report=html
 open htmlcov/index.html  # View in browser (macOS)
 ```
 
 ### Development Commands
 
 ```bash
-# Install dependencies and setup
-poetry install
-poetry run pre-commit install
+# Install dependencies and setup (recommended)
+./setup.sh
+
+# Or manual setup
+uv sync --extra dev
+uv run pre-commit install
 
 # Code quality (run these before every commit)
-poetry run ruff format .
-poetry run ruff check .
-poetry run mypy src/modelforge
-poetry run pytest --cov=src/modelforge
+uv run ruff format .
+uv run ruff check .
+uv run mypy src/modelforge --ignore-missing-imports
+uv run pytest --cov=src/modelforge
 
 # CLI usage
-poetry run modelforge config show
-poetry run modelforge config add --provider ollama --model qwen3:1.7b
-poetry run modelforge config use --provider openai --model gpt-4o-mini
-poetry run modelforge test --prompt "Hello world"
+uv run modelforge config show
+uv run modelforge config add --provider ollama --model qwen3:1.7b
+uv run modelforge config use --provider openai --model gpt-4o-mini
+uv run modelforge test --prompt "Hello world"
 ```
 
 ## Key Files
