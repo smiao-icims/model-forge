@@ -163,6 +163,112 @@ def test_device_flow_get_credentials_valid_token(mock_config: Mock) -> None:
     assert "expires_at" in credentials
 
 
+def test_device_flow_get_token_info_with_calculated_fields(mock_config: Mock) -> None:
+    """Test that get_token_info returns calculated time_remaining and expiry_time."""
+    # Arrange
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(hours=2, minutes=30)
+    token_info = {
+        "access_token": "test-token",
+        "expires_at": expires_at.isoformat(),
+        "scope": "read:user",
+    }
+
+    mock_config.get_config.return_value = (
+        {"providers": {"test_provider": {"auth_data": token_info}}},
+        None,
+    )
+
+    auth_strategy = DeviceFlowAuth(
+        "test_provider",
+        "test_client",
+        "https://device.url",
+        "https://token.url",
+        "read:user",
+    )
+
+    # Act
+    result = auth_strategy.get_token_info()
+
+    # Assert
+    assert result is not None
+    assert result["access_token"] == "test-token"  # noqa: S105
+    assert result["scope"] == "read:user"
+    assert "time_remaining" in result
+    assert "expiry_time" in result
+
+    # Check that time_remaining is approximately 2.5 hours
+    time_remaining_str = result["time_remaining"]
+    assert "2:" in time_remaining_str  # Should contain "2:" for 2 hours
+
+    # Check that expiry_time is formatted correctly
+    expiry_time = result["expiry_time"]
+    assert expiry_time.endswith(" UTC")
+    assert len(expiry_time) == 23  # "YYYY-MM-DD HH:MM:SS UTC"
+
+
+def test_device_flow_get_token_info_expired_token(mock_config: Mock) -> None:
+    """Test that get_token_info shows 'expired' for expired tokens."""
+    # Arrange
+    yesterday = datetime.now(UTC) - timedelta(days=1)
+    token_info = {
+        "access_token": "expired-token",
+        "expires_at": yesterday.isoformat(),
+    }
+
+    mock_config.get_config.return_value = (
+        {"providers": {"test_provider": {"auth_data": token_info}}},
+        None,
+    )
+
+    auth_strategy = DeviceFlowAuth(
+        "test_provider",
+        "test_client",
+        "https://device.url",
+        "https://token.url",
+        "read:user",
+    )
+
+    # Act
+    result = auth_strategy.get_token_info()
+
+    # Assert
+    assert result is not None
+    assert result["access_token"] == "expired-token"  # noqa: S105
+    assert result["time_remaining"] == "expired"
+    assert "expiry_time" in result
+
+
+def test_device_flow_get_token_info_no_expiration(mock_config: Mock) -> None:
+    """Test that get_token_info works with tokens that have no expiration info."""
+    # Arrange
+    token_info = {"access_token": "permanent-token", "scope": "read:user"}
+
+    mock_config.get_config.return_value = (
+        {"providers": {"test_provider": {"auth_data": token_info}}},
+        None,
+    )
+
+    auth_strategy = DeviceFlowAuth(
+        "test_provider",
+        "test_client",
+        "https://device.url",
+        "https://token.url",
+        "read:user",
+    )
+
+    # Act
+    result = auth_strategy.get_token_info()
+
+    # Assert
+    assert result is not None
+    assert result["access_token"] == "permanent-token"  # noqa: S105
+    assert result["scope"] == "read:user"
+    # No time_remaining or expiry_time should be added if expires_at is missing
+    assert "time_remaining" not in result
+    assert "expiry_time" not in result
+
+
 def test_device_flow_get_credentials_expired_token(mock_config: Mock) -> None:
     """Test that an expired token is not returned."""
     # Arrange

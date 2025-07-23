@@ -360,9 +360,37 @@ class DeviceFlowAuth(AuthStrategy):
 
     @handle_errors("get token info", fallback_value=None)
     def get_token_info(self) -> dict[str, Any] | None:
-        """Retrieve token information from config file."""
+        """Retrieve token information with calculated expiration details."""
         auth_data = self._get_auth_data()
-        return auth_data if auth_data else None
+        if not auth_data:
+            return None
+
+        # Make a copy to avoid modifying the original data
+        token_info = dict(auth_data)
+
+        # Add calculated expiration fields for CLI display
+        expires_at_str = token_info.get("expires_at")
+        if expires_at_str:
+            try:
+                expires_at = datetime.fromisoformat(expires_at_str)
+                now = datetime.now(UTC)
+
+                # Calculate time remaining
+                time_remaining = expires_at - now
+                if time_remaining.total_seconds() > 0:
+                    token_info["time_remaining"] = str(time_remaining)
+                else:
+                    token_info["time_remaining"] = "expired"
+
+                # Add human-readable expiry time
+                token_info["expiry_time"] = expires_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    "Invalid expires_at format for %s: %s", self.provider_name, e
+                )
+
+        return token_info
 
     @handle_errors("clear OAuth credentials")
     def clear_credentials(self) -> None:
