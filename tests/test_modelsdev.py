@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 from requests_mock import Mocker
 
+from modelforge.exceptions import InvalidInputError, ModelNotFoundError, ProviderError
 from modelforge.modelsdev import ModelsDevClient
 
 
@@ -317,8 +318,6 @@ class TestModelsDevClient:
 
         client = ModelsDevClient()
 
-        from modelforge.exceptions import ProviderError
-
         with pytest.raises(ProviderError, match="Provider.*not found") as exc_info:
             client.get_model_info("nonexistent", "gpt-4", force_refresh=True)
 
@@ -343,8 +342,6 @@ class TestModelsDevClient:
         )
 
         client = ModelsDevClient()
-
-        from modelforge.exceptions import ModelNotFoundError
 
         with pytest.raises(ModelNotFoundError, match="Model.*not found") as exc_info:
             client.get_model_info("openai", "nonexistent", force_refresh=True)
@@ -387,8 +384,6 @@ class TestModelsDevClient:
         """Test input validation for provider and model names."""
         client = ModelsDevClient()
 
-        from modelforge.exceptions import InvalidInputError
-
         # Test empty provider
         with pytest.raises(InvalidInputError, match="Provider name cannot be empty"):
             client.get_model_info("", "gpt-4")
@@ -413,8 +408,6 @@ class TestModelsDevClient:
 
             # Clear any existing cache
             client.clear_cache()
-
-            from modelforge.exceptions import ProviderError
 
             with pytest.raises(
                 ProviderError, match="Expected JSON response, got text/html"

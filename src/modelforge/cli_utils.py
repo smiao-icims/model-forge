@@ -22,7 +22,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 class ErrorFormatter:
     """Formats errors for CLI display."""
 
-    def __init__(self, verbose: bool = False, debug: bool = False) -> None:  # noqa: ANN101
+    def __init__(self, verbose: bool = False, debug: bool = False) -> None:
         """Initialize error formatter.
 
         Args:
@@ -32,7 +32,7 @@ class ErrorFormatter:
         self.verbose = verbose
         self.debug = debug
 
-    def format_error(self, error: Exception) -> str:  # noqa: ANN101
+    def format_error(self, error: Exception) -> str:
         """Format an exception for CLI display.
 
         Args:
@@ -45,7 +45,7 @@ class ErrorFormatter:
             return self._format_modelforge_error(error)
         return self._format_generic_error(error)
 
-    def _format_modelforge_error(self, error: ModelForgeError) -> str:  # noqa: ANN101
+    def _format_modelforge_error(self, error: ModelForgeError) -> str:
         """Format ModelForgeError with context and suggestions."""
         parts = []
 
@@ -80,7 +80,7 @@ class ErrorFormatter:
 
         return "\n".join(parts)
 
-    def _format_generic_error(self, error: Exception) -> str:  # noqa: ANN101
+    def _format_generic_error(self, error: Exception) -> str:
         """Format generic exceptions."""
         # Basic error message
         error_type = type(error).__name__
