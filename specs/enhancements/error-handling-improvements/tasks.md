@@ -1,0 +1,176 @@
+# Error Handling Improvements - Tasks
+
+## Phase 1: Exception Foundation (8 hours)
+
+### Exception Hierarchy Implementation
+- [ ] **TASK-001**: Create `src/modelforge/exceptions.py` with `ModelForgeError` base class
+- [ ] **TASK-002**: Implement configuration error classes (`ConfigurationError`, `ConfigurationNotFoundError`, `ConfigurationValidationError`)
+- [ ] **TASK-003**: Implement authentication error classes (`AuthenticationError`, `InvalidApiKeyError`, `TokenExpiredError`)
+- [ ] **TASK-004**: Implement network error classes (`NetworkError`, `NetworkTimeoutError`, `RateLimitError`)
+- [ ] **TASK-005**: Implement provider error classes (`ProviderError`, `ModelNotFoundError`, `ProviderNotAvailableError`)
+- [ ] **TASK-006**: Implement validation error classes (`ValidationError`, `InvalidInputError`, `FileValidationError`)
+- [ ] **TASK-007**: Add `to_dict()` method for structured logging on all exception classes
+- [ ] **TASK-008**: Add unit tests for all exception classes with 100% coverage
+
+### Error Handler Implementation
+- [ ] **TASK-009**: Create `src/modelforge/error_handler.py` with `handle_errors` decorator
+- [ ] **TASK-010**: Implement exception mapping for common Python exceptions to ModelForge exceptions
+- [ ] **TASK-011**: Add support for fallback values in error handler
+- [ ] **TASK-012**: Implement structured logging in error handler
+- [ ] **TASK-013**: Add unit tests for error handler with various exception types
+
+### Retry Mechanism
+- [ ] **TASK-014**: Create `src/modelforge/retry.py` with `retry_on_error` decorator
+- [ ] **TASK-015**: Implement exponential backoff algorithm
+- [ ] **TASK-016**: Add support for custom retry strategies per error type
+- [ ] **TASK-017**: Implement rate limit aware retry (honor retry-after headers)
+- [ ] **TASK-018**: Add unit tests for retry mechanism with mocked delays
+
+## Phase 2: Input Validation (6 hours)
+
+### Validation Framework
+- [ ] **TASK-019**: Create `src/modelforge/validation.py` with `InputValidator` class
+- [ ] **TASK-020**: Implement `validate_provider_name()` with format checking
+- [ ] **TASK-021**: Implement `validate_model_name()` with length and character validation
+- [ ] **TASK-022**: Implement `validate_api_key()` with provider-specific patterns
+- [ ] **TASK-023**: Implement `validate_file_path()` with existence and permission checks
+- [ ] **TASK-024**: Implement `validate_url()` for endpoint validation
+- [ ] **TASK-025**: Add unit tests for all validators with edge cases
+
+### Validation Integration
+- [ ] **TASK-026**: Add validation to `config.add_provider()` method
+- [ ] **TASK-027**: Add validation to `config.add_model()` method
+- [ ] **TASK-028**: Add validation to `registry.get_model()` method
+- [ ] **TASK-029**: Add validation to all CLI command inputs
+- [ ] **TASK-030**: Add integration tests for validation in real operations
+
+## Phase 3: Module Updates (10 hours)
+
+### Config Module Updates
+- [ ] **TASK-031**: Replace generic exceptions with specific ModelForge exceptions in `config.py`
+- [ ] **TASK-032**: Add `@handle_errors` decorator to all public methods
+- [ ] **TASK-033**: Improve error messages with context and suggestions
+- [ ] **TASK-034**: Add validation before all operations
+- [ ] **TASK-035**: Update unit tests to check for new exception types
+
+### Auth Module Updates
+- [ ] **TASK-036**: Replace generic exceptions with specific ModelForge exceptions in `auth.py`
+- [ ] **TASK-037**: Add `@retry_on_error` to network operations
+- [ ] **TASK-038**: Enhance OAuth error messages with troubleshooting steps
+- [ ] **TASK-039**: Add token validation before use
+- [ ] **TASK-040**: Update unit tests for new error handling
+
+### Registry Module Updates
+- [ ] **TASK-041**: Replace generic exceptions with specific ModelForge exceptions in `registry.py`
+- [ ] **TASK-042**: Add detailed error context for model creation failures
+- [ ] **TASK-043**: Implement fallback to default models on errors
+- [ ] **TASK-044**: Add provider availability checking
+- [ ] **TASK-045**: Update unit tests for enhanced error scenarios
+
+### ModelsDevClient Updates
+- [ ] **TASK-046**: Integrate new exception hierarchy in `modelsdev.py`
+- [ ] **TASK-047**: Add `@retry_on_error` to API calls
+- [ ] **TASK-048**: Enhance cache fallback error messages
+- [ ] **TASK-049**: Add API response validation
+- [ ] **TASK-050**: Update tests for new error patterns
+
+## Phase 4: CLI Enhancement (8 hours)
+
+### Error Display Framework
+- [ ] **TASK-051**: Create `src/modelforge/cli_utils.py` with `ErrorFormatter` class
+- [ ] **TASK-052**: Implement error formatting with colors and icons
+- [ ] **TASK-053**: Add verbose and debug mode support
+- [ ] **TASK-054**: Create `@handle_cli_errors` decorator
+- [ ] **TASK-055**: Add unit tests for error formatting
+
+### CLI Command Updates
+- [ ] **TASK-056**: Apply `@handle_cli_errors` to all command functions
+- [ ] **TASK-057**: Replace all `click.echo(err=True)` with error formatter
+- [ ] **TASK-058**: Add input validation to all command arguments
+- [ ] **TASK-059**: Implement user-friendly error messages for common scenarios
+- [ ] **TASK-060**: Add integration tests for CLI error display
+
+### Interactive Error Help
+- [ ] **TASK-061**: Add `--debug` flag to show detailed error information
+- [ ] **TASK-062**: Implement error code lookup command
+- [ ] **TASK-063**: Add suggestions for common error resolutions
+- [ ] **TASK-064**: Create help text for all error codes
+- [ ] **TASK-065**: Test interactive error features
+
+## Phase 5: Testing & Documentation (6 hours)
+
+### Comprehensive Testing
+- [ ] **TASK-066**: Create `tests/test_exceptions.py` with full exception hierarchy tests
+- [ ] **TASK-067**: Create `tests/test_error_handler.py` for decorator testing
+- [ ] **TASK-068**: Create `tests/test_retry.py` for retry mechanism tests
+- [ ] **TASK-069**: Create `tests/test_validation.py` for input validation tests
+- [ ] **TASK-070**: Add error scenario tests to existing test files
+
+### Integration Testing
+- [ ] **TASK-071**: Test error propagation from provider to CLI
+- [ ] **TASK-072**: Test retry behavior with real network delays
+- [ ] **TASK-073**: Test concurrent error scenarios
+- [ ] **TASK-074**: Test error recovery workflows
+- [ ] **TASK-075**: Verify no regression in happy path performance
+
+### Documentation
+- [ ] **TASK-076**: Create `docs/error-reference.md` with all error codes
+- [ ] **TASK-077**: Add troubleshooting section to README
+- [ ] **TASK-078**: Document error handling patterns for developers
+- [ ] **TASK-079**: Create migration guide from old to new exceptions
+- [ ] **TASK-080**: Update CLI help text with error information
+
+## Phase 6: Polish & Optimization (4 hours)
+
+### Performance Optimization
+- [ ] **TASK-081**: Profile error handling overhead
+- [ ] **TASK-082**: Optimize exception creation for hot paths
+- [ ] **TASK-083**: Implement lazy loading for error messages
+- [ ] **TASK-084**: Cache validation results where appropriate
+- [ ] **TASK-085**: Benchmark retry mechanism performance
+
+### Final Polish
+- [ ] **TASK-086**: Review all error messages for clarity and consistency
+- [ ] **TASK-087**: Ensure no sensitive data in error messages
+- [ ] **TASK-088**: Add telemetry hooks for error monitoring (disabled by default)
+- [ ] **TASK-089**: Create error catalog for support team
+- [ ] **TASK-090**: Final testing pass with user scenarios
+
+## Success Metrics
+
+### Code Quality Metrics
+- Exception hierarchy test coverage: 100%
+- Error path test coverage: >90%
+- All public methods have error handling
+- No generic `except Exception` without re-raise
+- All user inputs validated
+
+### User Experience Metrics
+- All errors have helpful suggestions
+- Error messages are non-technical
+- Consistent error formatting across CLI
+- Debug mode provides full context
+- Common errors resolve in <3 attempts
+
+### Performance Metrics
+- Error handling overhead: <1ms per call
+- Retry delays follow exponential backoff
+- Validation caching reduces repeated checks
+- No performance regression in happy path
+
+## Implementation Order
+
+1. **Week 1**: Phase 1 (Exception Foundation) + Phase 2 (Validation)
+2. **Week 2**: Phase 3 (Module Updates)
+3. **Week 3**: Phase 4 (CLI Enhancement) + Phase 5 (Testing & Docs)
+4. **Week 4**: Phase 6 (Polish) + Release preparation
+
+## Definition of Done
+
+Each task is considered complete when:
+1. Code is implemented and follows project standards
+2. Unit tests pass with >90% coverage
+3. Integration tests pass
+4. Documentation is updated
+5. Code review approved
+6. No linting or type checking errors
