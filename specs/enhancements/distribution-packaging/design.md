@@ -53,10 +53,10 @@ classifiers = [
 keywords = ["llm", "ai", "langchain", "openai", "ollama", "providers"]
 
 [project.urls]
-Homepage = "https://github.com/your-org/model-forge"
-Repository = "https://github.com/your-org/model-forge"
+Homepage = "https://github.com/smiao-icims/model-forge"
+Repository = "https://github.com/smiao-icims/model-forge"
 Documentation = "https://model-forge.readthedocs.io"
-Issues = "https://github.com/your-org/model-forge/issues"
+Issues = "https://github.com/smiao-icims/model-forge/issues"
 
 [project.scripts]
 modelforge = "modelforge.cli:cli"

@@ -89,9 +89,9 @@ dev = [
 modelforge = "modelforge.cli:cli"
 
 [project.urls]
-Homepage = "https://github.com/your-org/model-forge"
-Repository = "https://github.com/your-org/model-forge"
-Issues = "https://github.com/your-org/model-forge/issues"
+Homepage = "https://github.com/smiao-icims/model-forge"
+Repository = "https://github.com/smiao-icims/model-forge"
+Issues = "https://github.com/smiao-icims/model-forge/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -337,7 +337,7 @@ pip install modelforge
 ### Development Setup
 ```bash
 # Clone repository
-git clone https://github.com/your-org/model-forge.git
+git clone https://github.com/smiao-icims/model-forge.git
 cd model-forge
 
 # Install UV

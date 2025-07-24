@@ -51,9 +51,9 @@ dev = [
 modelforge = "modelforge.cli:cli"
 
 [project.urls]
-Homepage = "https://github.com/your-org/model-forge"
-Repository = "https://github.com/your-org/model-forge"
-Issues = "https://github.com/your-org/model-forge/issues"
+Homepage = "https://github.com/smiao-icims/model-forge"
+Repository = "https://github.com/smiao-icims/model-forge"
+Issues = "https://github.com/smiao-icims/model-forge/issues"
 Documentation = "https://model-forge.readthedocs.io"
 
 [tool.setuptools.packages.find]
@@ -86,6 +86,7 @@ ignore = [
     "PLR0913", # Too many arguments in function definition (acceptable for CLI)
     "TRY003",  # Avoid specifying long messages outside exception class
     "TRY301",  # Abstract raise to inner function (acceptable for simple error handling)
+    "ANN101",  # Missing type annotation for self in method (not needed)
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -119,6 +120,7 @@ exclude = [
 # Per-file ignores for test files
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
+    "ANN101",  # Allow missing type annotation for self in method
     "ANN401",  # Allow Any type in tests (common for mocks)
     "S101",    # Allow assert in tests
     "S108",    # Allow hardcoded temp paths in tests
