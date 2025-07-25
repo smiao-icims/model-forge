@@ -379,6 +379,13 @@ def test_model(
     provider_name = current_model.get("provider")
     model_alias = current_model.get("model")
 
+    if not provider_name or not model_alias:
+        raise ConfigurationError(
+            "Invalid model configuration - missing provider or model",
+            context=f"Current model config: {current_model}",
+            suggestion="Re-select a model using 'modelforge config use'",
+        )
+
     logger.info("Testing model %s/%s with prompt", provider_name, model_alias)
     print_info(
         f"Sending prompt to the selected model [{provider_name}/{model_alias}]..."
