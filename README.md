@@ -6,7 +6,7 @@ A Python library for managing LLM providers, authentication, and model selection
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**🚀 Version 2.0.0 - Enhanced with Telemetry, Flexible I/O, and Simplified Architecture!**
+**🚀 Version 2.1.0 - Now with Environment Variable Auth and Streaming Support!**
 
 ## Installation
 
@@ -248,6 +248,52 @@ except ProviderError as e:
     print("Check: modelforge auth status")
 ```
 
+### Streaming Support (v2.1+)
+
+ModelForge provides enhanced streaming capabilities with automatic authentication handling:
+
+```python
+from modelforge.registry import ModelForgeRegistry
+from modelforge.streaming import stream
+
+# Initialize with your LLM
+registry = ModelForgeRegistry()
+llm = registry.get_llm()
+
+# Stream responses with auth handling
+async for chunk in stream(llm, "Write a story about AI",
+                         provider_name="openai",
+                         provider_data=registry._config.get("providers", {}).get("openai")):
+    print(chunk, end="", flush=True)
+
+# Stream to file with automatic token refresh
+from modelforge.streaming import stream_to_file
+from pathlib import Path
+
+await stream_to_file(llm, "Explain quantum computing",
+                    Path("output.txt"),
+                    provider_name="github_copilot",
+                    provider_data=provider_data)
+```
+
+**CLI Streaming:**
+```bash
+# Stream responses in real-time
+modelforge test --prompt "Write a story" --stream
+
+# Stream to file
+modelforge test --prompt "Explain AI" --stream --output-file response.txt
+```
+
+**Key Features:**
+- Automatic token refresh for OAuth providers during long streams
+- Environment variable authentication support
+- Retry on authentication errors
+- Progress callbacks and buffering options
+
+**Note on Streaming Behavior:**
+The actual streaming granularity depends on the provider's API implementation. Some providers (like GitHub Copilot) may return responses in larger chunks rather than token-by-token streaming, while others (like Ollama) support finer-grained streaming.
+
 ## Supported Providers
 
 - **OpenAI**: GPT-4, GPT-4o, GPT-3.5-turbo
@@ -262,6 +308,9 @@ ModelForge supports multiple authentication methods:
 - **API Keys**: Store securely in configuration
 - **Device Flow**: Browser-based OAuth for GitHub Copilot
 - **No Auth**: For local models like Ollama
+- **Environment Variables**: Zero-touch authentication for CI/CD (NEW in v2.1)
+
+### Authentication Methods
 
 ```bash
 # API Key authentication
@@ -273,6 +322,25 @@ modelforge auth login --provider github_copilot
 # Check auth status
 modelforge auth status
 ```
+
+### Environment Variable Support (v2.1+)
+
+For CI/CD and production deployments, you can use environment variables to provide credentials without storing them in configuration files:
+
+```bash
+# API Key providers
+export MODELFORGE_OPENAI_API_KEY="sk-..."
+export MODELFORGE_ANTHROPIC_API_KEY="sk-ant-..."
+export MODELFORGE_GOOGLE_API_KEY="..."
+
+# OAuth providers
+export MODELFORGE_GITHUB_COPILOT_ACCESS_TOKEN="ghu_..."
+
+# Use models without manual authentication
+modelforge test --prompt "Hello"
+```
+
+Environment variables take precedence over stored credentials and eliminate the need for interactive authentication.
 
 ## Configuration
 

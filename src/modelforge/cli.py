@@ -326,12 +326,14 @@ def remove_model(
 @click.option("--output-file", "-o", type=click.Path(), help="Write response to file.")
 @click.option("--verbose", is_flag=True, help="Enable verbose debug output.")
 @click.option("--no-telemetry", is_flag=True, help="Disable telemetry output.")
+@click.option("--stream", is_flag=True, help="Stream the response in real-time.")
 def test_model(
     prompt: str | None,
     input_file: str | None,
     output_file: str | None,
     verbose: bool,
     no_telemetry: bool,
+    stream: bool,
 ) -> None:
     """Tests the currently selected model with a prompt.
 
@@ -412,8 +414,73 @@ def test_model(
     prompt_template = ChatPromptTemplate.from_messages([("human", "{input}")])
     chain = prompt_template | llm | StrOutputParser()
 
-    # Step 4: Run the chain with smart retry if the provider is GitHub Copilot
-    if provider_name == "github_copilot":
+    # Step 4: Run the chain with streaming or regular invoke
+    if stream:
+        # Streaming mode
+        response_chunks = []
+
+        # Get provider config for auth handling during streaming
+        config_data, _ = config.get_config()
+
+        # Show prompt first for streaming
+        if not output_file:
+            max_prompt_display = 80
+            if len(prompt) > max_prompt_display:
+                display_prompt = prompt[: max_prompt_display - 3] + "..."
+            else:
+                display_prompt = prompt
+            click.echo()
+            click.echo(click.style("Q: ", fg="blue", bold=True) + display_prompt)
+            click.echo(click.style("A: ", fg="green", bold=True), nl=False)
+
+        # Stream the response
+        try:
+            # Use direct LLM streaming instead of chain streaming for better control
+            import sys
+
+            # For debugging - let's see what stream returns
+            if verbose:
+                logger.info("Starting streaming response...")
+
+            # Try using the chain's stream method with proper message format
+            stream_iter = chain.stream({"input": prompt})
+
+            for i, chunk in enumerate(stream_iter):
+                # Extract text content from chunk
+                chunk_text = str(chunk) if chunk else ""
+
+                if verbose and i == 0:
+                    logger.info(
+                        "First chunk type: %s, content: %s...",
+                        type(chunk),
+                        chunk_text[:50],
+                    )
+
+                response_chunks.append(chunk_text)
+                if not output_file and chunk_text:
+                    # Write chunk immediately
+                    sys.stdout.write(chunk_text)
+                    sys.stdout.flush()
+        except Exception as e:
+            # Handle streaming errors
+            if "401" in str(e) or "unauthorized" in str(e).lower():
+                click.echo(
+                    click.style(
+                        "\nAuthentication error during streaming. "
+                        "Please re-authenticate.",
+                        fg="red",
+                    )
+                )
+                raise
+            click.echo(click.style(f"\nStreaming error: {e}", fg="red"))
+            raise
+
+        # Combine chunks for telemetry and file output
+        response = "".join(response_chunks)
+        if not output_file:
+            click.echo()  # New line after streaming
+    # Regular invoke mode
+    elif provider_name == "github_copilot":
         response = _invoke_with_smart_retry(chain, {"input": prompt}, verbose)
     else:
         response = chain.invoke({"input": prompt})
@@ -434,17 +501,18 @@ def test_model(
         ):
             click.echo(format_metrics(telemetry.metrics))
     else:
-        # Format as Q&A chat style for console output
-        max_prompt_display = 80  # Maximum characters to display for the prompt
+        # For non-streaming mode, format as Q&A chat style for console output
+        if not stream:
+            max_prompt_display = 80  # Maximum characters to display for the prompt
 
-        if len(prompt) > max_prompt_display:
-            display_prompt = prompt[: max_prompt_display - 3] + "..."
-        else:
-            display_prompt = prompt
+            if len(prompt) > max_prompt_display:
+                display_prompt = prompt[: max_prompt_display - 3] + "..."
+            else:
+                display_prompt = prompt
 
-        click.echo()  # Empty line before Q&A
-        click.echo(click.style("Q: ", fg="blue", bold=True) + display_prompt)
-        click.echo(click.style("A: ", fg="green", bold=True) + response)
+            click.echo()  # Empty line before Q&A
+            click.echo(click.style("Q: ", fg="blue", bold=True) + display_prompt)
+            click.echo(click.style("A: ", fg="green", bold=True) + response)
 
         # Step 5: Display telemetry information (unless disabled)
         settings = config.get_settings()

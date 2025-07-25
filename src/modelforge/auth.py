@@ -2,6 +2,7 @@
 
 import getpass
 import json
+import os
 import time
 import webbrowser
 from datetime import UTC, datetime, timedelta
@@ -21,6 +22,34 @@ from .retry import retry_on_error
 from .validation import InputValidator
 
 logger = get_logger(__name__)
+
+
+def _normalize_provider_name_for_env(provider_name: str) -> str:
+    """Normalize provider name for environment variable lookups.
+
+    Converts provider names to uppercase and replaces hyphens with underscores.
+    e.g., 'github-copilot' -> 'GITHUB_COPILOT'
+    """
+    return provider_name.upper().replace("-", "_")
+
+
+def _get_env_var_for_provider(provider_name: str, credential_type: str) -> str | None:
+    """Get environment variable value for a provider's credentials.
+
+    Args:
+        provider_name: The provider name (e.g., 'openai', 'github-copilot')
+        credential_type: Type of credential ('API_KEY' or 'ACCESS_TOKEN')
+
+    Returns:
+        The environment variable value if set, None otherwise
+    """
+    normalized_name = _normalize_provider_name_for_env(provider_name)
+    env_var_name = f"MODELFORGE_{normalized_name}_{credential_type}"
+
+    value = os.getenv(env_var_name)
+    if value:
+        logger.debug("Found credential in environment variable: %s", env_var_name)
+    return value
 
 
 # Module-level functions for config operations
@@ -135,12 +164,34 @@ class ApiKeyAuth(AuthStrategy):
         logger.info("API key stored for %s", self.provider_name)
 
     def get_credentials(self) -> dict[str, Any] | None:
-        """Retrieve stored API key from config."""
+        """Retrieve API key from environment or config.
+
+        Checks in order:
+        1. Environment variable (MODELFORGE_<PROVIDER>_API_KEY)
+        2. Stored in config file
+        """
+        # Check environment variable first
+        env_api_key = _get_env_var_for_provider(self.provider_name, "API_KEY")
+        if env_api_key:
+            logger.info(
+                "Using API key from environment variable for %s", self.provider_name
+            )
+            # Validate the API key format if known provider
+            try:
+                validated_key = InputValidator.validate_api_key(
+                    env_api_key, self.provider_name
+                )
+            except Exception:
+                # If validation fails, still accept the key (for custom providers)
+                validated_key = env_api_key
+            return {"api_key": validated_key}
+
+        # Fall back to config file
         auth_data = self._get_auth_data()
         if auth_data and "api_key" in auth_data:
-            logger.debug("Retrieved API key for %s", self.provider_name)
+            logger.debug("Retrieved API key from config for %s", self.provider_name)
             return auth_data
-        logger.warning("No stored API key found for %s", self.provider_name)
+        logger.warning("No API key found for %s", self.provider_name)
         return None
 
 
@@ -299,7 +350,23 @@ class DeviceFlowAuth(AuthStrategy):
         self._save_auth_data(token_data)
 
     def get_credentials(self) -> dict[str, Any] | None:
-        """Retrieve stored token info. If expired, try to refresh."""
+        """Retrieve token from environment or stored info.
+
+        Checks in order:
+        1. Environment variable (MODELFORGE_<PROVIDER>_ACCESS_TOKEN)
+        2. Stored token (with refresh if expired)
+        """
+        # Check environment variable first
+        env_token = _get_env_var_for_provider(self.provider_name, "ACCESS_TOKEN")
+        if env_token:
+            logger.info(
+                "Using access token from environment variable for %s",
+                self.provider_name,
+            )
+            # Environment tokens are assumed to be valid and don't expire
+            return {"access_token": env_token}
+
+        # Fall back to stored token
         token_info = self.get_token_info()
         if not token_info:
             logger.debug("No token info found for %s.", self.provider_name)
