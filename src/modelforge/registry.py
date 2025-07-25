@@ -114,7 +114,9 @@ class ModelForgeRegistry:
         raise ProviderError(
             f"Unsupported llm_type '{llm_type}'",
             context=f"Provider '{provider_name}' uses an unknown LLM type",
-            suggestion="Supported types: ollama, google_genai, openai_compatible, github_copilot",
+            suggestion=(
+                "Supported: ollama, google_genai, openai_compatible, github_copilot"
+            ),
             error_code="UNSUPPORTED_LLM_TYPE",
         )
 

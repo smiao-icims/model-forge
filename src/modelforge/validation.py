@@ -62,9 +62,7 @@ class InputValidator:
 
         # Normalize provider name (convert hyphens to underscores for consistency)
         # This allows both github-copilot and github_copilot to work
-        normalized = provider.lower().replace("-", "_")
-
-        return normalized
+        return provider.lower().replace("-", "_")
 
     @classmethod
     def validate_model_name(cls: type[InputValidator], model: str | None) -> str:

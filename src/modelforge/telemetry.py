@@ -90,7 +90,8 @@ class TelemetryCallback(BaseCallbackHandler):
 
         logger.debug(
             f"LLM completed: {self.metrics.provider}/{self.metrics.model} "
-            f"- {self.metrics.token_usage.total_tokens} tokens in {self.metrics.duration_ms:.0f}ms"
+            f"- {self.metrics.token_usage.total_tokens} tokens "
+            f"in {self.metrics.duration_ms:.0f}ms"
         )
 
     def on_llm_error(self, error: BaseException, **kwargs: Any) -> None:
@@ -207,7 +208,8 @@ def format_metrics(metrics: ModelMetrics) -> str:
         # Add note for GitHub Copilot
         if metrics.provider.lower() == "github_copilot":
             lines.append(
-                "   Note: GitHub Copilot is subscription-based. Cost shown is for reference only."
+                "   Note: GitHub Copilot is subscription-based. "
+                "Cost shown is for reference only."
             )
 
     if metrics.error:

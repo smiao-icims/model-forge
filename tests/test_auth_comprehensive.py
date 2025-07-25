@@ -34,7 +34,7 @@ class TestDeviceFlowAuthErrors:
         mock_requests.exceptions.HTTPError = requests.exceptions.HTTPError
 
         mock_time = mocker.patch("modelforge.auth.time")
-        mock_webbrowser = mocker.patch("modelforge.auth.webbrowser")
+        mocker.patch("modelforge.auth.webbrowser")  # Mock but don't assign (not used)
 
         # Mock device code response
         device_response = Mock()
@@ -88,14 +88,13 @@ class TestDeviceFlowAuthErrors:
 
     def test_device_flow_poll_expired_token(self, mocker: MockerFixture) -> None:
         """Test handling of expired_token response during polling."""
-        # Create a real HTTPError instance
-        http_error = requests.exceptions.HTTPError()
+        # http_error will be created inline where needed
 
         mock_requests = mocker.patch("modelforge.auth.requests")
         # Make sure exceptions are available on the mock
         mock_requests.exceptions.HTTPError = requests.exceptions.HTTPError
 
-        mock_webbrowser = mocker.patch("modelforge.auth.webbrowser")
+        mocker.patch("modelforge.auth.webbrowser")  # Mock but don't assign (not used)
 
         # Mock device code response
         device_response = Mock()
@@ -136,7 +135,7 @@ class TestDeviceFlowAuthErrors:
         # Make sure exceptions are available on the mock
         mock_requests.exceptions.HTTPError = requests.exceptions.HTTPError
 
-        mock_webbrowser = mocker.patch("modelforge.auth.webbrowser")
+        mocker.patch("modelforge.auth.webbrowser")  # Mock but don't assign (not used)
 
         # Mock device code response
         device_response = Mock()
@@ -170,14 +169,13 @@ class TestDeviceFlowAuthErrors:
 
     def test_device_flow_poll_json_decode_error(self, mocker: MockerFixture) -> None:
         """Test handling of JSON decode error during polling."""
-        # Create a real HTTPError instance
-        http_error = requests.exceptions.HTTPError()
+        # http_error will be created inline where needed
 
         mock_requests = mocker.patch("modelforge.auth.requests")
         # Make sure exceptions are available on the mock
         mock_requests.exceptions.HTTPError = requests.exceptions.HTTPError
 
-        mock_webbrowser = mocker.patch("modelforge.auth.webbrowser")
+        mocker.patch("modelforge.auth.webbrowser")  # Mock but don't assign (not used)
 
         # Mock device code response
         device_response = Mock()
@@ -218,7 +216,7 @@ class TestDeviceFlowAuthErrors:
         # Make sure exceptions are available on the mock
         mock_requests.exceptions.HTTPError = requests.exceptions.HTTPError
 
-        mock_webbrowser = mocker.patch("modelforge.auth.webbrowser")
+        mocker.patch("modelforge.auth.webbrowser")  # Mock but don't assign (not used)
 
         # Mock device code response
         device_response = Mock()
@@ -259,7 +257,7 @@ class TestDeviceFlowAuthErrors:
         # Make sure exceptions are available on the mock
         mock_requests.exceptions.HTTPError = requests.exceptions.HTTPError
 
-        mock_webbrowser = mocker.patch("modelforge.auth.webbrowser")
+        mocker.patch("modelforge.auth.webbrowser")  # Mock but don't assign (not used)
 
         # Mock device code response
         device_response = Mock()
@@ -298,7 +296,7 @@ class TestDeviceFlowAuthErrors:
         mock_requests = mocker.patch("modelforge.auth.requests")
         mock_webbrowser = mocker.patch("modelforge.auth.webbrowser")
         mock_webbrowser.open.side_effect = Exception("Browser error")
-        mock_time = mocker.patch("modelforge.auth.time")
+        mocker.patch("modelforge.auth.time")  # Mock but don't assign (not used)
 
         # Mock successful flow
         device_response = Mock()
@@ -495,7 +493,7 @@ class TestApiKeyAuth:
 
     def test_authenticate_no_api_key_entered(self, mocker: MockerFixture) -> None:
         """Test when user doesn't enter an API key."""
-        mock_getpass = mocker.patch("modelforge.auth.getpass.getpass", return_value="")
+        mocker.patch("modelforge.auth.getpass.getpass", return_value="")
 
         auth = ApiKeyAuth("test_provider")
 
@@ -505,9 +503,7 @@ class TestApiKeyAuth:
 
     def test_authenticate_validation_exception(self, mocker: MockerFixture) -> None:
         """Test when API key validation throws exception."""
-        mock_getpass = mocker.patch(
-            "modelforge.auth.getpass.getpass", return_value="test-key"
-        )
+        mocker.patch("modelforge.auth.getpass.getpass", return_value="test-key")
         mock_validator = mocker.patch("modelforge.auth.InputValidator.validate_api_key")
         mock_validator.side_effect = Exception("Validation error")
 

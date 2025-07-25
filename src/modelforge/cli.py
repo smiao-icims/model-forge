@@ -358,7 +358,7 @@ def test_model(
         if sys.stdin.isatty():
             # Interactive terminal - require --prompt
             raise click.BadParameter(
-                "No prompt provided. Use --prompt, --input-file, or pipe input via stdin"
+                "No prompt provided. Use --prompt, --input-file, or pipe via stdin"
             )
         # Non-interactive - read from stdin
         prompt = sys.stdin.read().strip()
@@ -427,10 +427,10 @@ def test_model(
             click.echo(format_metrics(telemetry.metrics))
     else:
         # Format as Q&A chat style for console output
-        MAX_PROMPT_DISPLAY = 80  # Maximum characters to display for the prompt
+        max_prompt_display = 80  # Maximum characters to display for the prompt
 
-        if len(prompt) > MAX_PROMPT_DISPLAY:
-            display_prompt = prompt[: MAX_PROMPT_DISPLAY - 3] + "..."
+        if len(prompt) > max_prompt_display:
+            display_prompt = prompt[: max_prompt_display - 3] + "..."
         else:
             display_prompt = prompt
 

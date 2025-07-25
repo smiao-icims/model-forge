@@ -452,7 +452,7 @@ def get_auth_strategy(
     raise ConfigurationError(
         f"Unknown auth strategy '{strategy_name}'",
         context=f"Provider '{provider_name}' uses an unsupported authentication method",
-        suggestion="Supported strategies: 'api_key', 'device_flow', or omit for no auth",
+        suggestion="Supported: 'api_key', 'device_flow', or omit for no auth",
         error_code="UNKNOWN_AUTH_STRATEGY",
     )
 

@@ -481,7 +481,7 @@ def test_get_llm_with_verbose_logging(mocker: MockerFixture) -> None:
     # Mock dependencies
     mock_get_config = mocker.patch("modelforge.registry.config.get_config")
     mock_get_credentials = mocker.patch("modelforge.registry.auth.get_credentials")
-    mock_chat_openai = mocker.patch("modelforge.registry.ChatOpenAI")
+    mocker.patch("modelforge.registry.ChatOpenAI")  # Mock but don't assign (not used)
     mock_logger = mocker.patch("modelforge.registry.logger")
 
     # Set up the configuration
