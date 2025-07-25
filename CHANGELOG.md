@@ -5,6 +5,59 @@ All notable changes to ModelForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-01-25
+
+### Added
+- **Environment Variable Authentication**
+  - Zero-touch authentication for CI/CD pipelines
+  - Support for `MODELFORGE_<PROVIDER>_API_KEY` and `MODELFORGE_<PROVIDER>_ACCESS_TOKEN`
+  - Provider name normalization (github-copilot → GITHUB_COPILOT)
+  - Environment variables take precedence over stored credentials
+  - No configuration file changes required for deployment
+
+- **Streaming Support with Authentication**
+  - Real-time streaming responses with `--stream` flag in CLI
+  - `StreamingAuthHandler` for token monitoring during long responses
+  - `StreamWrapper` class for auth-aware streaming in Python API
+  - Automatic OAuth token refresh during streaming sessions
+  - Authentication error handling and retry logic during streams
+  - Async streaming API with timeout and progress callbacks
+
+- **Enhanced Development Experience**
+  - Comprehensive test coverage for environment variables and streaming
+  - 227 total tests with new auth and streaming test suites
+  - Provider-specific streaming behavior documentation
+  - Types for aiofiles support for async file operations
+
+### Changed
+- **CLI Streaming Interface**
+  - Added `--stream` flag to `modelforge test` command
+  - Visual feedback shows real-time token generation
+  - Provider-dependent streaming granularity (Ollama: token-by-token, GitHub Copilot: buffered)
+  - Improved error messages for streaming authentication issues
+
+- **Authentication Priority**
+  - Environment variables now take precedence over stored credentials
+  - Streamlined authentication flow for automated environments
+  - Backward compatibility maintained for existing configurations
+
+### Fixed
+- Long line formatting issues in CLI error messages
+- Type annotations for all test methods
+- Exception handling in streaming modules (proper chaining and logging)
+- Pre-commit hook compliance for all new code
+
+### Technical Details
+- **New Files**
+  - `src/modelforge/streaming.py` - Streaming support with auth handling
+  - `tests/test_auth_env_vars.py` - Environment variable authentication tests
+  - `tests/test_streaming_simple.py` - Basic streaming functionality tests
+  - `specs/v2.1/` - Complete specification documents for v2.1 features
+
+- **Updated Dependencies**
+  - Added `types-aiofiles` for async file operation type support
+  - All existing dependencies maintained at current versions
+
 ## [2.0.0] - 2025-01-25
 
 ### Added
@@ -116,6 +169,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Upgrade Guide
+
+### From 2.0 to 2.1
+
+ModelForge 2.1 is fully backward compatible with 2.0. To upgrade:
+
+```bash
+pip install --upgrade model-forge-llm
+```
+
+**New Features to Try:**
+
+1. **Environment Variable Authentication** (great for CI/CD):
+   ```bash
+   export MODELFORGE_OPENAI_API_KEY="sk-..."
+   export MODELFORGE_GITHUB_COPILOT_ACCESS_TOKEN="ghu_..."
+   # No need for modelforge auth login anymore!
+   ```
+
+2. **Streaming Responses**:
+   ```bash
+   modelforge test --prompt "Write a story" --stream
+   ```
+
+3. **Async Python API**:
+   ```python
+   from modelforge.streaming import stream
+   async for chunk in stream(llm, "Hello world"):
+       print(chunk, end="", flush=True)
+   ```
+
+**CI/CD Integration**: Replace interactive auth with environment variables for zero-touch deployment.
 
 ### From 1.x to 2.0
 
