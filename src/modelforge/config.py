@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .error_handler import handle_errors
 from .exceptions import (
     ConfigurationNotFoundError,
     FileValidationError,
@@ -113,7 +112,6 @@ def save_config(config_data: dict[str, Any], local: bool = False) -> None:
         ) from e
 
 
-@handle_errors("set current model")
 def set_current_model(provider: str, model: str, local: bool = False) -> bool:
     """
     Set the current model for the given provider.
@@ -167,6 +165,44 @@ def set_current_model(provider: str, model: str, local: bool = False) -> bool:
     return True
 
 
+def get_settings() -> dict[str, Any]:
+    """Get settings from configuration.
+
+    Returns default values if settings don't exist.
+    """
+    config_data, _ = get_config()
+    settings = config_data.get("settings", {})
+
+    # Default settings
+    defaults = {
+        "show_telemetry": True,
+    }
+
+    # Merge with defaults
+    return {**defaults, **settings}
+
+
+def update_setting(key: str, value: Any, local: bool = False) -> None:
+    """Update a specific setting.
+
+    Args:
+        key: Setting key to update
+        value: New value for the setting
+        local: Whether to update local config instead of global
+    """
+    target_config_path = get_config_path(local=local)
+    config_data, _ = get_config_from_path(target_config_path)
+
+    if "settings" not in config_data:
+        config_data["settings"] = {}
+
+    config_data["settings"][key] = value
+    save_config(config_data, local=local)
+
+    scope = "local" if local else "global"
+    logger.info(f"Updated setting '{key}' to '{value}' in {scope} config")
+
+
 def get_current_model() -> dict[str, str] | None:
     """
     Get the currently selected model.
@@ -178,7 +214,6 @@ def get_current_model() -> dict[str, str] | None:
     return config_data.get("current_model")
 
 
-@handle_errors("migrate configuration")
 def migrate_old_config() -> None:
     """
     Migrate configuration from the old location to the new global location.

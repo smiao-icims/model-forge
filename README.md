@@ -6,7 +6,7 @@ A Python library for managing LLM providers, authentication, and model selection
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**🚀 Version 1.0.0 - Production Ready!**
+**🚀 Version 2.0.0 - Enhanced with Telemetry, Flexible I/O, and Simplified Architecture!**
 
 ## Installation
 
@@ -93,13 +93,49 @@ modelforge config add --provider ollama --model qwen3:1.7b --local
 modelforge config use --provider openai --model gpt-4o-mini
 modelforge config remove --provider openai --model gpt-4o-mini
 
-# Testing & Usage
+# Testing & Usage (NEW in v2.0: Flexible I/O)
 modelforge test --prompt "Hello, how are you?"        # Test current model
 modelforge test --prompt "Explain quantum computing" --verbose  # Debug mode
+modelforge test --input-file prompt.txt --output-file response.txt  # File I/O
+echo "What is AI?" | modelforge test                 # Stdin input
+modelforge test --prompt "Hello" --no-telemetry      # Disable telemetry
 
 # Cache & Maintenance
 modelforge models list --refresh                     # Force refresh from models.dev
+
+# Telemetry Settings (NEW in v2.0)
+modelforge settings telemetry on                      # Enable telemetry display
+modelforge settings telemetry off                     # Disable telemetry display
+modelforge settings telemetry status                  # Check current setting
 ```
+
+## What's New in v2.0
+
+### 🎯 Telemetry & Cost Tracking
+- **Token usage monitoring**: See exactly how many tokens each request uses
+- **Cost estimation**: Real-time cost calculation for supported providers
+  - For GitHub Copilot: Shows reference costs based on equivalent OpenAI models (subscription-based service)
+- **Performance metrics**: Request duration and model response times
+- **Configurable display**: Enable/disable telemetry output globally or per-command
+
+### 📥 Flexible Input/Output
+- **Multiple input sources**: Command line, files, or stdin
+- **File output**: Save responses directly to files
+- **Streaming support**: Pipe commands together for automation
+- **Q&A formatting**: Clean, readable output for interactive use
+
+### 🏗️ Simplified Architecture
+- **Cleaner codebase**: Removed complex decorators and factory patterns
+- **Direct error handling**: Clear, actionable error messages
+- **Improved test coverage**: Comprehensive test suite with 90%+ coverage
+- **Better maintainability**: Simplified patterns for easier contribution
+
+### 🔧 Enhanced CLI
+- **Settings management**: Global configuration for telemetry and preferences
+- **Improved error messages**: Context and suggestions for common issues
+- **Better help text**: More descriptive command documentation
+- **Consistent output**: Unified formatting across all commands
+- **Provider name flexibility**: Both `github-copilot` and `github_copilot` formats supported
 
 ## Python API
 
@@ -123,16 +159,24 @@ response = chain.invoke({"input": "Tell me a joke"})
 print(response)
 ```
 
-### Advanced Usage
+### Advanced Usage with Telemetry (NEW in v2.0)
 
 ```python
 from modelforge.registry import ModelForgeRegistry
+from modelforge.telemetry import TelemetryCallback
 
 # Initialize with debug logging
 registry = ModelForgeRegistry(verbose=True)
 
-# Get specific model by provider and name
-llm = registry.get_llm(provider_name="openai", model_alias="gpt-4o-mini")
+# Create telemetry callback
+telemetry = TelemetryCallback(provider="openai", model="gpt-4o-mini")
+
+# Get model with telemetry tracking
+llm = registry.get_llm(
+    provider_name="openai",
+    model_alias="gpt-4o-mini",
+    callbacks=[telemetry]
+)
 
 # Use with full LangChain features
 from langchain_core.prompts import ChatPromptTemplate
@@ -153,6 +197,15 @@ questions = [
     "How does backpropagation work?"
 ]
 responses = chain.batch([{"topic": q} for q in questions])
+
+# Access telemetry data after execution
+print(f"Tokens used: {telemetry.metrics.token_usage.total_tokens}")
+print(f"Duration: {telemetry.metrics.duration_ms:.0f}ms")
+print(f"Estimated cost: ${telemetry.metrics.estimated_cost:.6f}")
+
+# Format telemetry for display
+from modelforge.telemetry import format_metrics
+print(format_metrics(telemetry.metrics))
 ```
 
 ### Configuration Management
@@ -168,6 +221,13 @@ print(f"Current: {current.get('provider')}/{current.get('model')}")
 if not current:
     print("No model selected. Configure with:")
     print("modelforge config add --provider openai --model gpt-4o-mini")
+
+# Manage settings (NEW in v2.0)
+settings = config.get_settings()
+print(f"Telemetry enabled: {settings.get('show_telemetry', True)}")
+
+# Update settings
+config.update_setting("show_telemetry", False)  # Disable telemetry
 ```
 
 ### Error Handling
@@ -193,7 +253,7 @@ except ProviderError as e:
 - **OpenAI**: GPT-4, GPT-4o, GPT-3.5-turbo
 - **Google**: Gemini Pro, Gemini Flash
 - **Ollama**: Local models (Llama, Qwen, Mistral)
-- **GitHub Copilot**: Claude, GPT models via GitHub
+- **GitHub Copilot**: Claude, GPT models via GitHub (use `github_copilot` or `github-copilot`)
 
 ## Authentication
 

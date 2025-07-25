@@ -46,6 +46,33 @@ We use several tools to maintain code quality:
 - **Pytest**: For testing
 - **Pre-commit**: For automated checks
 
+### Linting Strategy
+
+We balance code quality with pragmatism. Our linting configuration in `pyproject.toml` enforces critical rules while allowing flexibility for legitimate use cases:
+
+#### Enforced Rules (Critical for code quality)
+- **E/F/W**: Basic Python errors and warnings
+- **I**: Import sorting
+- **N**: Naming conventions
+- **UP**: Python version upgrade suggestions
+- **B**: Common Python bugs
+- **RET**: Return statement issues
+- **SIM**: Code simplification
+
+#### Relaxed Rules (Non-critical style preferences)
+- **PLR0912/PLR0915**: Complex CLI commands may exceed branch/statement limits
+- **ARG002**: Callbacks and overrides often have unused arguments
+- **ANN401**: Dynamic Python sometimes needs `Any` type
+- **PLC0415**: Conditional imports are sometimes necessary
+- **S105**: Test files contain mock tokens/passwords
+
+#### Test-Specific Relaxations
+Tests have additional relaxed rules since they follow different patterns:
+- Type annotations are optional (focus on test clarity)
+- Hardcoded test data is allowed
+- Longer lines for complex assertions
+- More arguments in test fixtures
+
 ### Code Review Guidelines
 
 We maintain comprehensive code review standards:

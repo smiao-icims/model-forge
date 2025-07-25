@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import requests
 from requests_mock import Mocker
 
 from modelforge.exceptions import InvalidInputError, ModelNotFoundError, ProviderError
@@ -127,7 +128,7 @@ class TestModelsDevClient:
         # Check that capabilities are extracted
         assert isinstance(models[0]["capabilities"], list)
         # Check that pricing is extracted
-        assert models[0]["pricing"]["input_per_1k_tokens"] == 0.03
+        assert models[0]["pricing"]["input_per_1m_tokens"] == 0.03
 
     def test_get_models_with_provider_filter(self, requests_mock: Mocker) -> None:
         """Test models retrieval with provider filter."""
@@ -274,9 +275,9 @@ class TestModelsDevClient:
             with patch.object(ModelsDevClient, "CACHE_DIR", cache_dir):
                 client = ModelsDevClient()
 
-                # Should return empty list when no cache available
-                providers = client.get_providers()
-                assert providers == []
+                # Should raise HTTPError without error handler
+                with pytest.raises(requests.HTTPError):
+                    client.get_providers()
 
     def test_cache_validation(self) -> None:
         """Test cache TTL validation."""

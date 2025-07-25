@@ -2,6 +2,7 @@
 import json
 import random
 import time
+from pathlib import Path
 from typing import Any
 
 # Third-party imports
@@ -12,12 +13,6 @@ from langchain_core.prompts import ChatPromptTemplate
 
 # Local imports
 from . import auth, config
-from .cli_utils import (
-    handle_cli_errors,
-    print_info,
-    print_success,
-    print_warning,
-)
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -29,9 +24,26 @@ from .exceptions import (
 from .logging_config import get_logger
 from .modelsdev import ModelsDevClient
 from .registry import ModelForgeRegistry
+from .telemetry import TelemetryCallback, format_metrics
 from .validation import InputValidator
 
 logger = get_logger(__name__)
+
+
+# CLI Utility Functions (merged from cli_utils.py)
+def print_success(message: str) -> None:
+    """Print a success message with formatting."""
+    click.echo(click.style(f"✅ {message}", fg="green"))
+
+
+def print_warning(message: str) -> None:
+    """Print a warning message with formatting."""
+    click.echo(click.style(f"⚠️  {message}", fg="yellow"), err=True)
+
+
+def print_info(message: str) -> None:
+    """Print an info message with formatting."""
+    click.echo(click.style(f"ℹ️  {message}", fg="blue"))
 
 
 def _handle_authentication(
@@ -79,7 +91,6 @@ def config_group() -> None:
 
 
 @config_group.command(name="show")
-@handle_cli_errors
 def show_config() -> None:
     """Shows the current configuration."""
     current_config, config_path = config.get_config()
@@ -128,7 +139,6 @@ def migrate_config() -> None:
     is_flag=True,
     help="Save to local project config (./.model-forge/config.json).",
 )
-@handle_cli_errors
 def add_model(
     provider: str,
     model: str,
@@ -224,7 +234,6 @@ def add_model(
 @click.option(
     "--local", is_flag=True, help="Set the current model in the local project config."
 )
-@handle_cli_errors
 def use_model(provider_name: str, model_alias: str, local: bool) -> None:
     """Set the current model to use."""
     # Validate inputs
@@ -245,7 +254,6 @@ def use_model(provider_name: str, model_alias: str, local: bool) -> None:
     help="Keep stored credentials (don't remove from config).",
 )
 @click.option("--local", is_flag=True, help="Remove from the local project config.")
-@handle_cli_errors
 def remove_model(
     provider: str, model: str | None, keep_credentials: bool, local: bool
 ) -> None:
@@ -311,11 +319,53 @@ def remove_model(
 
 
 @cli.command(name="test")
-@click.option("--prompt", required=True, help="The prompt to send to the model.")
+@click.option("--prompt", "-p", help="The prompt to send to the model.")
+@click.option(
+    "--input-file", "-i", type=click.Path(exists=True), help="Read prompt from file."
+)
+@click.option("--output-file", "-o", type=click.Path(), help="Write response to file.")
 @click.option("--verbose", is_flag=True, help="Enable verbose debug output.")
-@handle_cli_errors
-def test_model(prompt: str, verbose: bool) -> None:
-    """Tests the currently selected model with a prompt."""
+@click.option("--no-telemetry", is_flag=True, help="Disable telemetry output.")
+def test_model(
+    prompt: str | None,
+    input_file: str | None,
+    output_file: str | None,
+    verbose: bool,
+    no_telemetry: bool,
+) -> None:
+    """Tests the currently selected model with a prompt.
+
+    Prompt can be provided via:
+    - --prompt flag
+    - --input-file flag
+    - stdin (if neither flag is provided)
+
+    Output goes to stdout by default, or to file with --output-file.
+    """
+    import sys
+
+    # Determine input source
+    if prompt and input_file:
+        raise click.BadParameter("Cannot specify both --prompt and --input-file")
+
+    if input_file:
+        # Read from file
+        input_path = Path(input_file)
+        prompt = input_path.read_text(encoding="utf-8").strip()
+        if not prompt:
+            raise click.BadParameter(f"Input file '{input_file}' is empty")
+    elif not prompt:
+        # Read from stdin if no prompt provided
+        if sys.stdin.isatty():
+            # Interactive terminal - require --prompt
+            raise click.BadParameter(
+                "No prompt provided. Use --prompt, --input-file, or pipe via stdin"
+            )
+        # Non-interactive - read from stdin
+        prompt = sys.stdin.read().strip()
+        if not prompt:
+            raise click.BadParameter("No input received from stdin")
+
     current_model = config.get_current_model()
     if not current_model:
         raise ConfigurationError(
@@ -334,9 +384,12 @@ def test_model(prompt: str, verbose: bool) -> None:
         f"Sending prompt to the selected model [{provider_name}/{model_alias}]..."
     )
 
-    # Step 1: Instantiate the registry and get the model
+    # Step 1: Create telemetry callback
+    telemetry = TelemetryCallback(provider=provider_name, model=model_alias)
+
+    # Step 2: Instantiate the registry and get the model with telemetry
     registry = ModelForgeRegistry(verbose=verbose)
-    llm = registry.get_llm()  # Gets the currently selected model
+    llm = registry.get_llm(callbacks=[telemetry])  # Gets the currently selected model
 
     if not llm:
         raise ProviderError(
@@ -348,17 +401,52 @@ def test_model(prompt: str, verbose: bool) -> None:
             ),
         )
 
-    # Step 2: Create the prompt and chain
+    # Step 3: Create the prompt and chain
     prompt_template = ChatPromptTemplate.from_messages([("human", "{input}")])
     chain = prompt_template | llm | StrOutputParser()
 
-    # Step 3: Run the chain with smart retry if the provider is GitHub Copilot
+    # Step 4: Run the chain with smart retry if the provider is GitHub Copilot
     if provider_name == "github_copilot":
         response = _invoke_with_smart_retry(chain, {"input": prompt}, verbose)
     else:
         response = chain.invoke({"input": prompt})
 
-    click.echo(response)
+    # Format output
+    if output_file:
+        # Write to file (raw response only)
+        output_path = Path(output_file)
+        output_path.write_text(response, encoding="utf-8")
+        print_success(f"Response written to {output_file}")
+
+        # Still show telemetry to console if enabled
+        settings = config.get_settings()
+        show_telemetry = settings.get("show_telemetry", True) and not no_telemetry
+
+        if show_telemetry and (
+            telemetry.metrics.token_usage.total_tokens > 0 or verbose
+        ):
+            click.echo(format_metrics(telemetry.metrics))
+    else:
+        # Format as Q&A chat style for console output
+        max_prompt_display = 80  # Maximum characters to display for the prompt
+
+        if len(prompt) > max_prompt_display:
+            display_prompt = prompt[: max_prompt_display - 3] + "..."
+        else:
+            display_prompt = prompt
+
+        click.echo()  # Empty line before Q&A
+        click.echo(click.style("Q: ", fg="blue", bold=True) + display_prompt)
+        click.echo(click.style("A: ", fg="green", bold=True) + response)
+
+        # Step 5: Display telemetry information (unless disabled)
+        settings = config.get_settings()
+        show_telemetry = settings.get("show_telemetry", True) and not no_telemetry
+
+        if show_telemetry and (
+            telemetry.metrics.token_usage.total_tokens > 0 or verbose
+        ):
+            click.echo(format_metrics(telemetry.metrics))
 
 
 @cli.group(name="auth")
@@ -372,7 +460,6 @@ def auth_group() -> None:
 @click.option(
     "--force", is_flag=True, help="Force re-authentication even if credentials exist"
 )
-@handle_cli_errors
 def auth_login(provider: str, api_key: str | None, force: bool) -> None:
     """Authenticate with a provider using API key or device flow."""
     # Validate provider name
@@ -431,7 +518,6 @@ def auth_login(provider: str, api_key: str | None, force: bool) -> None:
 @auth_group.command(name="logout")
 @click.option("--provider", required=False, help="The provider to log out from")
 @click.option("--all-providers", is_flag=True, help="Log out from all providers")
-@handle_cli_errors
 def auth_logout(provider: str | None, all_providers: bool) -> None:
     """Clear stored credentials for a provider."""
     if all_providers:
@@ -476,7 +562,6 @@ def auth_logout(provider: str | None, all_providers: bool) -> None:
 @auth_group.command(name="status")
 @click.option("--provider", help="Check status for specific provider")
 @click.option("--verbose", is_flag=True, help="Show detailed token information")
-@handle_cli_errors
 def auth_status(provider: str | None, verbose: bool) -> None:
     """Check authentication status for providers."""
     current_config, _ = config.get_config()
@@ -502,6 +587,41 @@ def auth_status(provider: str | None, verbose: bool) -> None:
 
 
 @cli.group()
+def settings() -> None:
+    """Manage ModelForge settings."""
+
+
+@settings.command(name="show")
+def show_settings() -> None:
+    """Show current settings."""
+    current_settings = config.get_settings()
+    print_info("Current ModelForge Settings:")
+    for key, value in current_settings.items():
+        click.echo(f"  {key}: {value}")
+
+
+@settings.command(name="telemetry")
+@click.argument("action", type=click.Choice(["on", "off", "status"]))
+@click.option("--local", is_flag=True, help="Update local project config.")
+def manage_telemetry(action: str, local: bool) -> None:
+    """Manage telemetry display settings."""
+    if action == "status":
+        settings = config.get_settings()
+        current_state = (
+            "enabled" if settings.get("show_telemetry", True) else "disabled"
+        )
+        print_info(f"Telemetry display is currently {current_state}")
+    elif action == "on":
+        config.update_setting("show_telemetry", True, local=local)
+        scope = "local" if local else "global"
+        print_success(f"Telemetry display enabled in {scope} config")
+    elif action == "off":
+        config.update_setting("show_telemetry", False, local=local)
+        scope = "local" if local else "global"
+        print_success(f"Telemetry display disabled in {scope} config")
+
+
+@cli.group()
 def models() -> None:
     """Model discovery and management commands."""
 
@@ -512,7 +632,6 @@ def models() -> None:
 @click.option(
     "--format", "output_format", type=click.Choice(["table", "json"]), default="table"
 )
-@handle_cli_errors
 def list_models(provider: str | None, refresh: bool, output_format: str) -> None:
     """List available models from models.dev."""
     if provider:
@@ -558,7 +677,6 @@ def list_models(provider: str | None, refresh: bool, output_format: str) -> None
 @click.option("--capability", multiple=True, help="Filter by capabilities")
 @click.option("--max-price", type=float, help="Maximum price per 1K tokens")
 @click.option("--refresh", is_flag=True, help="Force refresh from models.dev")
-@handle_cli_errors
 def search_models(
     query: str,
     provider: str | None,
@@ -601,8 +719,9 @@ def search_models(
 
         if model.get("pricing"):
             pricing = model["pricing"]
-            if "input_per_1k_tokens" in pricing:
-                click.echo(f"   Price: ${pricing['input_per_1k_tokens']}/1K tokens")
+            input_price = pricing.get("input_per_1m_tokens")
+            if input_price is not None:
+                click.echo(f"   Price: ${input_price}/1M tokens")
 
         click.echo()
 
@@ -611,7 +730,6 @@ def search_models(
 @click.option("--provider", required=True, help="The provider name")
 @click.option("--model", required=True, help="The model name")
 @click.option("--refresh", is_flag=True, help="Force refresh from models.dev")
-@handle_cli_errors
 def model_info(provider: str, model: str, refresh: bool) -> None:
     """Get detailed information about a specific model."""
     # Validate inputs
@@ -627,7 +745,6 @@ def model_info(provider: str, model: str, refresh: bool) -> None:
 @cli.command(name="status")
 @click.option("--provider", help="Check status for specific provider")
 @click.option("--verbose", is_flag=True, help="Show detailed token information")
-@handle_cli_errors
 def status(provider: str | None, verbose: bool) -> None:
     """Check authentication status for providers (deprecated, use 'auth status')."""
     print_warning("This command is deprecated. Use 'modelforge auth status' instead.")

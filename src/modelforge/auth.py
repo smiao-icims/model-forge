@@ -1,16 +1,15 @@
 """Authentication strategies for ModelForge providers."""
 
 import getpass
+import json
 import time
 import webbrowser
-from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import requests
 
 from .config import get_config, save_config
-from .error_handler import handle_errors
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -24,8 +23,48 @@ from .validation import InputValidator
 logger = get_logger(__name__)
 
 
-class AuthStrategy(ABC):
-    """Abstract base class for authentication strategies."""
+# Module-level functions for config operations
+def get_auth_data(provider_name: str) -> dict[str, Any]:
+    """Get authentication data from config file."""
+    config_data, _ = get_config()
+    providers = config_data.get("providers", {})
+    provider_data = providers.get(provider_name, {})
+    return dict(provider_data.get("auth_data", {}))
+
+
+def save_auth_data(provider_name: str, auth_data: dict[str, Any]) -> None:
+    """Save authentication data to config file."""
+    config_data, _ = get_config()
+
+    # Ensure providers section exists
+    if "providers" not in config_data:
+        config_data["providers"] = {}
+
+    # Ensure provider section exists
+    if provider_name not in config_data["providers"]:
+        config_data["providers"][provider_name] = {}
+
+    # Store auth data
+    config_data["providers"][provider_name]["auth_data"] = auth_data
+
+    # Save config
+    save_config(config_data)
+    logger.info("Successfully saved auth data for %s", provider_name)
+
+
+def clear_auth_data(provider_name: str) -> None:
+    """Clear authentication data from config file."""
+    config_data, _ = get_config()
+    providers = config_data.get("providers", {})
+
+    if provider_name in providers:
+        providers[provider_name].pop("auth_data", None)
+        save_config(config_data)
+        logger.info("Cleared stored auth data for %s", provider_name)
+
+
+class AuthStrategy:
+    """Base class for authentication strategies."""
 
     def __init__(self, provider_name: str) -> None:
         """Initialize the authentication strategy.
@@ -34,62 +73,34 @@ class AuthStrategy(ABC):
         """
         self.provider_name = provider_name
 
-    @abstractmethod
     def authenticate(self) -> dict[str, Any] | None:
         """Perform authentication and return credentials."""
+        raise NotImplementedError
 
-    @abstractmethod
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored credentials."""
+        raise NotImplementedError
 
-    @abstractmethod
     def clear_credentials(self) -> None:
         """Clear any stored credentials for the provider."""
+        clear_auth_data(self.provider_name)
 
-    @handle_errors("get auth data")
     def _get_auth_data(self) -> dict[str, Any]:
         """Get authentication data from config file."""
-        config_data, _ = get_config()
-        providers = config_data.get("providers", {})
-        provider_data = providers.get(self.provider_name, {})
-        return dict(provider_data.get("auth_data", {}))
+        return get_auth_data(self.provider_name)
 
-    @handle_errors("save auth data")
     def _save_auth_data(self, auth_data: dict[str, Any]) -> None:
         """Save authentication data to config file."""
-        config_data, _ = get_config()
+        save_auth_data(self.provider_name, auth_data)
 
-        # Ensure providers section exists
-        if "providers" not in config_data:
-            config_data["providers"] = {}
-
-        # Ensure provider section exists
-        if self.provider_name not in config_data["providers"]:
-            config_data["providers"][self.provider_name] = {}
-
-        # Store auth data
-        config_data["providers"][self.provider_name]["auth_data"] = auth_data
-
-        # Save config
-        save_config(config_data)
-        logger.info("Successfully saved auth data for %s", self.provider_name)
-
-    @handle_errors("clear auth data")
     def _clear_auth_data(self) -> None:
         """Clear authentication data from config file."""
-        config_data, _ = get_config()
-        providers = config_data.get("providers", {})
-
-        if self.provider_name in providers:
-            providers[self.provider_name].pop("auth_data", None)
-            save_config(config_data)
-            logger.info("Cleared stored auth data for %s", self.provider_name)
+        clear_auth_data(self.provider_name)
 
 
 class ApiKeyAuth(AuthStrategy):
     """API key authentication strategy."""
 
-    @handle_errors("authenticate with API key")
     def authenticate(self) -> dict[str, Any] | None:
         """Prompt for API key and store it in config."""
         api_key = getpass.getpass(f"Enter API key for {self.provider_name}: ")
@@ -110,7 +121,6 @@ class ApiKeyAuth(AuthStrategy):
         logger.warning("No API key provided for %s", self.provider_name)
         return None
 
-    @handle_errors("store API key")
     def store_api_key(self, api_key: str) -> None:
         """Store API key for the provider without prompting."""
         # Validate the API key format if known provider
@@ -124,7 +134,6 @@ class ApiKeyAuth(AuthStrategy):
         self._save_auth_data(auth_data)
         logger.info("API key stored for %s", self.provider_name)
 
-    @handle_errors("get API key credentials", fallback_value=None)
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored API key from config."""
         auth_data = self._get_auth_data()
@@ -133,11 +142,6 @@ class ApiKeyAuth(AuthStrategy):
             return auth_data
         logger.warning("No stored API key found for %s", self.provider_name)
         return None
-
-    @handle_errors("clear API key credentials")
-    def clear_credentials(self) -> None:
-        """Clear stored API key from config."""
-        self._clear_auth_data()
 
 
 class DeviceFlowAuth(AuthStrategy):
@@ -193,7 +197,6 @@ class DeviceFlowAuth(AuthStrategy):
         # Step 3: Poll for token
         return self._poll_for_token(device_code_data)
 
-    @handle_errors("request device code")
     @retry_on_error(max_retries=3)
     def _request_device_code(self) -> dict[str, Any]:
         """Request device code from the provider."""
@@ -209,7 +212,6 @@ class DeviceFlowAuth(AuthStrategy):
         response.raise_for_status()
         return dict(response.json())
 
-    @handle_errors("poll for token")
     def _poll_for_token(
         self, device_code_data: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -231,7 +233,7 @@ class DeviceFlowAuth(AuthStrategy):
                 )
                 token_data = token_response.json()
                 token_response.raise_for_status()
-            except requests.exceptions.JSONDecodeError as e:
+            except json.JSONDecodeError as e:
                 raise JsonDecodeError(
                     "token response",
                     reason=str(e),
@@ -286,7 +288,6 @@ class DeviceFlowAuth(AuthStrategy):
                 self._save_token_info(token_data)
                 return dict(token_data)
 
-    @handle_errors("save token info")
     def _save_token_info(self, token_data: dict[str, Any]) -> None:
         """Save token information to config file."""
         # Calculate expiry time and add to token_data
@@ -297,7 +298,6 @@ class DeviceFlowAuth(AuthStrategy):
 
         self._save_auth_data(token_data)
 
-    @handle_errors("get OAuth credentials", fallback_value=None)
     def get_credentials(self) -> dict[str, Any] | None:
         """Retrieve stored token info. If expired, try to refresh."""
         token_info = self.get_token_info()
@@ -325,7 +325,6 @@ class DeviceFlowAuth(AuthStrategy):
         logger.debug("Access token for %s is still valid.", self.provider_name)
         return token_info
 
-    @handle_errors("refresh OAuth token", fallback_value=None)
     @retry_on_error(max_retries=2)
     def _refresh_token(self) -> dict[str, Any] | None:
         """Use a refresh token to get a new access token."""
@@ -358,7 +357,6 @@ class DeviceFlowAuth(AuthStrategy):
         logger.info("Successfully refreshed token for %s", self.provider_name)
         return dict(new_token_data)
 
-    @handle_errors("get token info", fallback_value=None)
     def get_token_info(self) -> dict[str, Any] | None:
         """Retrieve token information with calculated expiration details."""
         auth_data = self._get_auth_data()
@@ -392,20 +390,14 @@ class DeviceFlowAuth(AuthStrategy):
 
         return token_info
 
-    @handle_errors("clear OAuth credentials")
-    def clear_credentials(self) -> None:
-        """Clear stored token from config file."""
-        self._clear_auth_data()
 
-
-@handle_errors("get auth strategy")
 def get_auth_strategy(
     provider_name: str,
     provider_data: dict[str, Any],
     model_alias: str | None = None,  # noqa: ARG001
 ) -> AuthStrategy:
     """
-    Factory function to get the correct authentication strategy for a provider.
+    Get the correct authentication strategy for a provider.
 
     Args:
         provider_name: The name of the provider.
@@ -418,7 +410,7 @@ def get_auth_strategy(
     Raises:
         ConfigurationError: If the provider is not found or misconfigured.
     """
-    if not provider_data:
+    if provider_data is None:
         raise ConfigurationError(
             f"Provider '{provider_name}' not found",
             context="Provider configuration is missing",
@@ -426,10 +418,13 @@ def get_auth_strategy(
             error_code="PROVIDER_NOT_CONFIGURED",
         )
 
-    strategy_name = provider_data.get("auth_strategy")
-    if not strategy_name:
+    if not provider_data:
+        # Empty dict means no auth needed
         return NoAuth(provider_name)
 
+    strategy_name = provider_data.get("auth_strategy", "")
+
+    # Direct mapping of strategies
     if strategy_name == "api_key":
         return ApiKeyAuth(provider_name)
 
@@ -442,7 +437,6 @@ def get_auth_strategy(
                 suggestion="Check provider configuration for missing auth_details",
                 error_code="DEVICE_FLOW_MISCONFIGURED",
             )
-
         return DeviceFlowAuth(
             provider_name,
             auth_details["client_id"],
@@ -451,19 +445,18 @@ def get_auth_strategy(
             auth_details["scope"],
         )
 
+    if strategy_name == "" or strategy_name is None:
+        return NoAuth(provider_name)
+
+    # Unknown strategy
     raise ConfigurationError(
         f"Unknown auth strategy '{strategy_name}'",
-        context=(
-            f"Provider '{provider_name}' uses an unsupported authentication method"
-        ),
-        suggestion=(
-            "Supported strategies: 'api_key', 'device_flow', or omit for no auth"
-        ),
+        context=f"Provider '{provider_name}' uses an unsupported authentication method",
+        suggestion="Supported: 'api_key', 'device_flow', or omit for no auth",
         error_code="UNKNOWN_AUTH_STRATEGY",
     )
 
 
-@handle_errors("get credentials", fallback_value=None)
 def get_credentials(
     provider_name: str,
     model_alias: str,
@@ -502,6 +495,3 @@ class NoAuth(AuthStrategy):
     def get_credentials(self) -> dict[str, Any] | None:
         """No credentials to retrieve."""
         return {}
-
-    def clear_credentials(self) -> None:
-        """No credentials to clear."""
