@@ -60,7 +60,11 @@ class InputValidator:
                 error_code="INVALID_PROVIDER_FORMAT",
             )
 
-        return provider.lower()
+        # Normalize provider name (convert hyphens to underscores for consistency)
+        # This allows both github-copilot and github_copilot to work
+        normalized = provider.lower().replace("-", "_")
+
+        return normalized
 
     @classmethod
     def validate_model_name(cls: type[InputValidator], model: str | None) -> str:

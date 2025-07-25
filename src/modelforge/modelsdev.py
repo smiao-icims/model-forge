@@ -7,7 +7,6 @@ from typing import Any
 
 import requests
 
-from .error_handler import handle_errors
 from .exceptions import (
     InvalidInputError,
     JsonDecodeError,
@@ -197,7 +196,6 @@ class ModelsDevClient:
         logger.warning("No cached data available, returning empty results")
         return []
 
-    @handle_errors("fetch providers from models.dev API")
     @retry_on_error(max_retries=3)
     def _fetch_providers(
         self, cache_path: Path, force_refresh: bool = False
@@ -237,7 +235,6 @@ class ModelsDevClient:
 
         return providers
 
-    @handle_errors("get providers list")
     def get_providers(self, force_refresh: bool = False) -> list[dict[str, Any]]:
         """Get list of supported providers from models.dev."""
         cache_path = self._get_cache_path("providers")
@@ -297,10 +294,10 @@ class ModelsDevClient:
             else:
                 parts.append("Text model")
 
-            # Add pricing info
+            # Add pricing info (per 1M tokens)
             cost = model_info.get("cost", {})
             if cost.get("input"):
-                parts.append(f"${cost['input']}/1K input")
+                parts.append(f"${cost['input']}/1M input")
 
             # Add context length
             limit = model_info.get("limit", {})
@@ -344,16 +341,18 @@ class ModelsDevClient:
         return capabilities
 
     def _extract_pricing(self, model_info: dict[str, Any]) -> dict[str, Any]:
-        """Extract pricing information from API response."""
+        """Extract pricing information from API response.
+
+        Note: models.dev returns prices in dollars per 1M tokens.
+        """
         cost = model_info.get("cost", {})
         return {
-            "input_per_1k_tokens": cost.get("input"),
-            "output_per_1k_tokens": cost.get("output"),
-            "cache_read_per_1k_tokens": cost.get("cache_read"),
-            "cache_write_per_1k_tokens": cost.get("cache_write"),
+            "input_per_1m_tokens": cost.get("input"),
+            "output_per_1m_tokens": cost.get("output"),
+            "cache_read_per_1m_tokens": cost.get("cache_read"),
+            "cache_write_per_1m_tokens": cost.get("cache_write"),
         }
 
-    @handle_errors("fetch models from models.dev API")
     @retry_on_error(max_retries=3)
     def _fetch_models(
         self, cache_path: Path, provider: str | None = None, force_refresh: bool = False
@@ -393,7 +392,6 @@ class ModelsDevClient:
 
         return models
 
-    @handle_errors("get models list")
     def get_models(
         self, provider: str | None = None, force_refresh: bool = False
     ) -> list[dict[str, Any]]:
@@ -413,7 +411,6 @@ class ModelsDevClient:
             logger.info("Network error occurred, attempting to use cached data")
             return self._handle_network_error(cache_path)
 
-    @handle_errors("fetch model info from models.dev API")
     @retry_on_error(max_retries=2)
     def _fetch_model_info(
         self, cache_path: Path, provider: str, model: str, force_refresh: bool = False
@@ -484,7 +481,6 @@ class ModelsDevClient:
         else:
             return model_info
 
-    @handle_errors("get model information")
     def get_model_info(
         self, provider: str, model: str, force_refresh: bool = False
     ) -> dict[str, Any]:
@@ -525,7 +521,6 @@ class ModelsDevClient:
                     pass
             raise
 
-    @handle_errors("fetch provider config from models.dev API")
     @retry_on_error(max_retries=2)
     def _fetch_provider_config(
         self, cache_path: Path, provider: str, force_refresh: bool = False
@@ -563,7 +558,6 @@ class ModelsDevClient:
 
         return provider_config
 
-    @handle_errors("get provider configuration")
     def get_provider_config(
         self, provider: str, force_refresh: bool = False
     ) -> dict[str, Any]:
@@ -578,14 +572,12 @@ class ModelsDevClient:
             cache_path, normalized_provider, force_refresh
         )
 
-    @handle_errors("clear models.dev cache")
     def clear_cache(self) -> None:
         """Clear all cached data."""
         for cache_file in self.CACHE_DIR.glob("*.json"):
             cache_file.unlink()
         logger.info("Cleared models.dev cache")
 
-    @handle_errors("search models")
     def search_models(
         self,
         query: str,
@@ -624,7 +616,7 @@ class ModelsDevClient:
             # Price filter
             if max_price is not None:
                 pricing = model.get("pricing", {})
-                price = pricing.get("input") or pricing.get("input_per_1k_tokens")
+                price = pricing.get("input_per_1m_tokens")
                 if price is not None and price > max_price:
                     continue
 

@@ -25,7 +25,7 @@ class TestModelDescriptionGeneration:
         description = self.client._generate_model_description(model_data)
 
         assert "Multimodal model" in description
-        assert "$2.5/1K input" in description
+        assert "$2.5/1M input" in description
         assert "128K context" in description
 
     def test_generate_model_description_reasoning_model(self) -> None:
@@ -41,7 +41,7 @@ class TestModelDescriptionGeneration:
         description = self.client._generate_model_description(model_data)
 
         assert "Reasoning model" in description
-        assert "$15/1K input" in description
+        assert "$15/1M input" in description
         assert "128K context" in description
 
     def test_generate_model_description_text_model(self) -> None:
@@ -57,7 +57,7 @@ class TestModelDescriptionGeneration:
         description = self.client._generate_model_description(model_data)
 
         assert "Text model" in description
-        assert "$0.5/1K input" in description
+        assert "$0.5/1M input" in description
         assert "16K context" in description
 
     def test_generate_model_description_with_minimal_data(self) -> None:
@@ -92,7 +92,7 @@ class TestModelDescriptionGeneration:
         description = self.client._generate_model_description(model_data)
 
         assert "Multimodal model" in description
-        assert "$1.25/1K input" in description
+        assert "$1.25/1M input" in description
         assert "2000K context" in description
 
     def test_generate_model_description_handles_exceptions(self) -> None:
@@ -162,10 +162,10 @@ class TestModelDescriptionGeneration:
 
         pricing = self.client._extract_pricing(model_data)
 
-        assert pricing["input_per_1k_tokens"] == 2.5
-        assert pricing["output_per_1k_tokens"] == 10
-        assert pricing["cache_read_per_1k_tokens"] == 1.25
-        assert pricing["cache_write_per_1k_tokens"] == 3.75
+        assert pricing["input_per_1m_tokens"] == 2.5
+        assert pricing["output_per_1m_tokens"] == 10
+        assert pricing["cache_read_per_1m_tokens"] == 1.25
+        assert pricing["cache_write_per_1m_tokens"] == 3.75
 
     def test_extract_pricing_partial(self) -> None:
         """Test pricing extraction with partial data."""
@@ -173,10 +173,10 @@ class TestModelDescriptionGeneration:
 
         pricing = self.client._extract_pricing(model_data)
 
-        assert pricing["input_per_1k_tokens"] == 0.15
-        assert pricing["output_per_1k_tokens"] == 0.6
-        assert pricing["cache_read_per_1k_tokens"] is None
-        assert pricing["cache_write_per_1k_tokens"] is None
+        assert pricing["input_per_1m_tokens"] == 0.15
+        assert pricing["output_per_1m_tokens"] == 0.6
+        assert pricing["cache_read_per_1m_tokens"] is None
+        assert pricing["cache_write_per_1m_tokens"] is None
 
     def test_extract_pricing_missing(self) -> None:
         """Test pricing extraction with missing cost data."""
@@ -184,10 +184,10 @@ class TestModelDescriptionGeneration:
 
         pricing = self.client._extract_pricing(model_data)
 
-        assert pricing["input_per_1k_tokens"] is None
-        assert pricing["output_per_1k_tokens"] is None
-        assert pricing["cache_read_per_1k_tokens"] is None
-        assert pricing["cache_write_per_1k_tokens"] is None
+        assert pricing["input_per_1m_tokens"] is None
+        assert pricing["output_per_1m_tokens"] is None
+        assert pricing["cache_read_per_1m_tokens"] is None
+        assert pricing["cache_write_per_1m_tokens"] is None
 
     def test_parse_model_data_integration(self) -> None:
         """Test full model data parsing integration."""
@@ -217,7 +217,7 @@ class TestModelDescriptionGeneration:
         assert model["provider"] == "openai"
         assert model["display_name"] == "GPT-4o"
         assert "Multimodal model" in model["description"]
-        assert "$2.5/1K input" in model["description"]
+        assert "$2.5/1M input" in model["description"]
         assert "128K context" in model["description"]
         assert model["context_length"] == 128000
         assert model["max_tokens"] == 16384

@@ -18,7 +18,8 @@ class TestProviderNameValidation:
         assert InputValidator.validate_provider_name("openai") == "openai"
         assert InputValidator.validate_provider_name("OpenAI") == "openai"  # Lowercase
         assert (
-            InputValidator.validate_provider_name("github-copilot") == "github-copilot"
+            InputValidator.validate_provider_name("github-copilot")
+            == "github_copilot"  # Normalized
         )
         assert InputValidator.validate_provider_name("ollama_local") == "ollama_local"
         assert InputValidator.validate_provider_name("provider123") == "provider123"
@@ -55,6 +56,24 @@ class TestProviderNameValidation:
         """Test whitespace handling in provider names."""
         assert InputValidator.validate_provider_name("  openai  ") == "openai"
         assert InputValidator.validate_provider_name("\topenai\n") == "openai"
+
+    def test_provider_name_hyphen_normalization(self) -> None:
+        """Test provider names with hyphens are normalized to underscores."""
+        assert (
+            InputValidator.validate_provider_name("github-copilot") == "github_copilot"
+        )
+        assert (
+            InputValidator.validate_provider_name("GITHUB-COPILOT") == "github_copilot"
+        )
+        assert (
+            InputValidator.validate_provider_name("some-provider-name")
+            == "some_provider_name"
+        )
+        # Mixed hyphens and underscores
+        assert (
+            InputValidator.validate_provider_name("github-copilot_v2")
+            == "github_copilot_v2"
+        )
 
 
 class TestModelNameValidation:
