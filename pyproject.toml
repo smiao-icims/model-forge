@@ -87,6 +87,11 @@ ignore = [
     "TRY003",  # Avoid specifying long messages outside exception class
     "TRY301",  # Abstract raise to inner function (acceptable for simple error handling)
     "ANN101",  # Missing type annotation for self in method (not needed)
+    "PLR0912", # Too many branches (CLI commands need complexity)
+    "PLR0915", # Too many statements (CLI commands need complexity)
+    "ARG002",  # Unused method argument (common in callbacks/overrides)
+    "ANN401",  # Any type (sometimes needed for dynamic code)
+    "PLC0415", # Import outside top-level (needed for conditional imports)
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -123,13 +128,17 @@ exclude = [
     "ANN101",  # Allow missing type annotation for self in method
     "ANN401",  # Allow Any type in tests (common for mocks)
     "S101",    # Allow assert in tests
+    "S105",    # Allow hardcoded passwords in tests (test tokens)
     "S108",    # Allow hardcoded temp paths in tests
     "PT019",   # Allow pytest fixtures without value
     "PLR2004", # Allow magic value comparison in tests
     "TRY002",  # Allow custom exceptions in tests
     "ARG001",  # Allow unused function arguments (common in test fixtures)
+    "ARG002",  # Allow unused method arguments (common in test fixtures)
     "PLR0913", # Allow many arguments in test functions
     "E501",    # Allow longer lines in tests (for assertions)
+    "ANN001",  # Allow missing type annotations in tests
+    "ANN202",  # Allow missing return type annotations in tests
 ]
 
 [tool.ruff.format]

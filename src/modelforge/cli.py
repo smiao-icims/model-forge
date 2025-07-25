@@ -2,6 +2,7 @@
 import json
 import random
 import time
+from pathlib import Path
 from typing import Any
 
 # Third-party imports
@@ -349,8 +350,8 @@ def test_model(
 
     if input_file:
         # Read from file
-        with open(input_file, encoding="utf-8") as f:
-            prompt = f.read().strip()
+        input_path = Path(input_file)
+        prompt = input_path.read_text(encoding="utf-8").strip()
         if not prompt:
             raise click.BadParameter(f"Input file '{input_file}' is empty")
     elif not prompt:
@@ -413,8 +414,8 @@ def test_model(
     # Format output
     if output_file:
         # Write to file (raw response only)
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(response)
+        output_path = Path(output_file)
+        output_path.write_text(response, encoding="utf-8")
         print_success(f"Response written to {output_file}")
 
         # Still show telemetry to console if enabled
