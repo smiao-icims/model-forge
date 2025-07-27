@@ -307,6 +307,68 @@ class TestFormatMetrics:
         assert "Completion tokens: 5,000" in result
         assert "Total tokens: 15,000" in result
 
+    def test_formatting_with_context_info(self) -> None:
+        """Test formatting with context window information from enhanced LLM."""
+        metrics = ModelMetrics(
+            provider="openai",
+            model="gpt-4",
+            duration_ms=2000.0,
+            token_usage=TokenUsage(
+                prompt_tokens=1000, completion_tokens=500, total_tokens=1500
+            ),
+            estimated_cost=0.045,
+            metadata={
+                "context_length": 128000,
+                "max_output_tokens": 4096,
+                "supports_function_calling": True,
+                "supports_vision": True,
+            },
+        )
+
+        result = format_metrics(metrics)
+
+        # Check basic info
+        assert "📊 Telemetry Information" in result
+        assert "Provider: openai" in result
+        assert "Model: gpt-4" in result
+
+        # Check context window information
+        assert "📊 Context Window:" in result
+        assert "Model limit: 128,000 tokens" in result
+        assert "Used: 1,000 tokens (0.8%)" in result
+        assert "Remaining: 127,000 tokens" in result
+        assert "Max output: 4,096 tokens" in result
+        assert "Capabilities: ✓ Functions, ✓ Vision" in result
+
+    def test_formatting_with_partial_context_info(self) -> None:
+        """Test formatting with partial context information."""
+        metrics = ModelMetrics(
+            provider="openai",
+            model="gpt-3.5-turbo",
+            duration_ms=1000.0,
+            token_usage=TokenUsage(
+                prompt_tokens=500, completion_tokens=250, total_tokens=750
+            ),
+            estimated_cost=0.001,
+            metadata={
+                "context_length": 16000,
+                "max_output_tokens": 4096,
+                "supports_function_calling": True,
+                "supports_vision": False,
+            },
+        )
+
+        result = format_metrics(metrics)
+
+        # Check context window information
+        assert "📊 Context Window:" in result
+        assert "Model limit: 16,000 tokens" in result
+        assert "Used: 500 tokens (3.1%)" in result
+        assert "Remaining: 15,500 tokens" in result
+        assert "Max output: 4,096 tokens" in result
+        assert "Capabilities: ✓ Functions" in result
+        assert "✓ Vision" not in result
+
 
 class TestIntegration:
     """Integration tests for telemetry components."""

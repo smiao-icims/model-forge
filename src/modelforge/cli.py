@@ -398,7 +398,10 @@ def test_model(
 
     # Step 2: Instantiate the registry and get the model with telemetry
     registry = ModelForgeRegistry(verbose=verbose)
-    llm = registry.get_llm(callbacks=[telemetry])  # Gets the currently selected model
+    # Get enhanced LLM to access metadata
+    llm = registry.get_llm(
+        callbacks=[telemetry], enhanced=True
+    )  # Gets the currently selected model with metadata
 
     if not llm:
         raise ProviderError(
@@ -499,6 +502,14 @@ def test_model(
         if show_telemetry and (
             telemetry.metrics.token_usage.total_tokens > 0 or verbose
         ):
+            # Add context information if using enhanced LLM
+            if hasattr(llm, "context_length"):
+                telemetry.metrics.metadata["context_length"] = llm.context_length
+                telemetry.metrics.metadata["max_output_tokens"] = llm.max_output_tokens
+                telemetry.metrics.metadata["supports_function_calling"] = (
+                    llm.supports_function_calling
+                )
+                telemetry.metrics.metadata["supports_vision"] = llm.supports_vision
             click.echo(format_metrics(telemetry.metrics))
     else:
         # For non-streaming mode, format as Q&A chat style for console output
@@ -521,6 +532,14 @@ def test_model(
         if show_telemetry and (
             telemetry.metrics.token_usage.total_tokens > 0 or verbose
         ):
+            # Add context information if using enhanced LLM
+            if hasattr(llm, "context_length"):
+                telemetry.metrics.metadata["context_length"] = llm.context_length
+                telemetry.metrics.metadata["max_output_tokens"] = llm.max_output_tokens
+                telemetry.metrics.metadata["supports_function_calling"] = (
+                    llm.supports_function_calling
+                )
+                telemetry.metrics.metadata["supports_vision"] = llm.supports_vision
             click.echo(format_metrics(telemetry.metrics))
 
 

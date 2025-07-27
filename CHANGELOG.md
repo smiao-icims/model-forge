@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Parameter configuration with validation: `temperature`, `top_p`, `top_k`, `max_tokens`
   - Parameters validated against model limits (e.g., max_tokens cannot exceed model's limit)
 
+- **Enhanced Telemetry Display**
+  - Test command now uses enhanced LLM mode by default for richer telemetry
+  - Context window information displayed in telemetry output:
+    - Model's context limit and max output tokens
+    - Token usage percentage and remaining context
+    - Model capabilities (function calling, vision support)
+  - Graceful handling for local models (Ollama) without metadata
+
 ### Changed
 - **Gradual Feature Rollout**
   - `get_llm()` now accepts optional `enhanced` parameter (defaults to `False` for compatibility)

@@ -197,6 +197,41 @@ def format_metrics(metrics: ModelMetrics) -> str:
         ]
     )
 
+    # Add context information if available (from enhanced LLM)
+    if metrics.metadata.get("context_length"):
+        context_length = metrics.metadata["context_length"]
+        used_tokens = metrics.token_usage.prompt_tokens
+        remaining = context_length - used_tokens
+        usage_percent = (
+            (used_tokens / context_length * 100) if context_length > 0 else 0
+        )
+
+        lines.extend(
+            [
+                "",
+                "📊 Context Window:",
+                f"  Model limit: {context_length:,} tokens",
+                f"  Used: {used_tokens:,} tokens ({usage_percent:.1f}%)",
+                f"  Remaining: {remaining:,} tokens",
+            ]
+        )
+
+        # Add capabilities info if available
+        if metrics.metadata.get("max_output_tokens"):
+            lines.append(
+                f"  Max output: {metrics.metadata['max_output_tokens']:,} tokens"
+            )
+
+        # Add model capabilities
+        capabilities = []
+        if metrics.metadata.get("supports_function_calling"):
+            capabilities.append("✓ Functions")
+        if metrics.metadata.get("supports_vision"):
+            capabilities.append("✓ Vision")
+
+        if capabilities:
+            lines.append(f"  Capabilities: {', '.join(capabilities)}")
+
     if metrics.estimated_cost > 0:
         lines.extend(
             [
