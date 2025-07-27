@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.callbacks import (
@@ -12,6 +12,9 @@ from langchain_core.callbacks import (
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
+from langchain_core.prompt_values import PromptValue
+from langchain_core.runnables import Runnable
+from langchain_core.tools import BaseTool
 
 if TYPE_CHECKING:
     pass
@@ -295,9 +298,20 @@ class EnhancedLLM(BaseChatModel):
         ):
             yield chunk
 
-    def bind_tools(self, tools: list[Any], **kwargs: Any) -> Any:
+    def bind_tools(
+        self,
+        tools: Sequence[dict[str, Any] | type | Callable[..., Any] | BaseTool],
+        *,
+        tool_choice: str | None = None,
+        **kwargs: Any,
+    ) -> Runnable[
+        PromptValue
+        | str
+        | Sequence[BaseMessage | list[str] | tuple[str, str] | str | dict[str, Any]],
+        BaseMessage,
+    ]:
         """Bind tools by delegating to wrapped model."""
-        return self._wrapped_llm.bind_tools(tools, **kwargs)
+        return self._wrapped_llm.bind_tools(tools, tool_choice=tool_choice, **kwargs)
 
     def with_structured_output(self, schema: Any, **kwargs: Any) -> Any:
         """Bind structured output schema by delegating to wrapped model."""

@@ -1,15 +1,16 @@
-# Browser Pilot Integration Guide for ModelForge v2.2.0+
+# Browser Pilot Integration Guide for ModelForge v2.2.1+
 
 ## Issue Summary
 
-Browser Pilot is getting this error with ModelForge v2.2.0:
-```
-ValueError: "ChatGitHubCopilot" object has no field "model_info"
-```
+Browser Pilot was experiencing compatibility issues with ModelForge v2.2.0+:
+
+1. **Missing `model_info` Property**: `ValueError: "ChatGitHubCopilot" object has no field "model_info"`
+2. **Callback Validation Error**: `LangChainVerboseCallback` not recognized as `BaseCallbackHandler`
+3. **Missing `bind_tools` Method**: `NotImplementedError` when calling `bind_tools()`
 
 ## Root Cause
 
-ModelForge v2.2.0 introduced an **opt-in** enhanced LLM wrapper that adds metadata properties like `model_info`. Browser Pilot is getting the raw `ChatGitHubCopilot` object because it's not requesting the enhanced version.
+ModelForge v2.2.0+ introduced an **opt-in** enhanced LLM wrapper that adds metadata properties and LangChain compatibility methods. Browser Pilot was getting the raw `ChatGitHubCopilot` object because it wasn't requesting the enhanced version, and some LangChain methods were missing from the wrapper.
 
 ## Solution Options
 
@@ -69,7 +70,8 @@ When using `enhanced=True`, you get access to:
 
 ## Migration Timeline
 
-- **v2.2.0 (current)**: Enhanced features are opt-in via `enhanced=True`
+- **v2.2.0**: Enhanced features introduced as opt-in via `enhanced=True`
+- **v2.2.1 (current)**: Added missing LangChain compatibility methods (`bind_tools`, `bind`, `with_structured_output`)
 - **v2.3.0 (planned)**: Enhanced features will be default (`enhanced=True` by default)
 
 ## Example Code
@@ -104,7 +106,7 @@ if isinstance(llm, EnhancedLLM):
 **Root Cause**: `LangChainVerboseCallback` didn't inherit from `BaseCallbackHandler`
 **Solution**: Updated Browser Pilot's callback class to properly inherit from `BaseCallbackHandler`
 
-### Issue 3: Missing `bind_tools` Method ✅ RESOLVED
+### Issue 3: Missing `bind_tools` Method ✅ RESOLVED (v2.2.1)
 **Root Cause**: `EnhancedLLM` wrapper was missing `bind_tools` delegation
 **Solution**: Added explicit `bind_tools`, `bind`, and `with_structured_output` methods to `EnhancedLLM`
 
@@ -112,4 +114,26 @@ if isinstance(llm, EnhancedLLM):
 
 **Use Option 1** (pass `enhanced=True`) for immediate compatibility and access to new features. This provides the cleanest integration and prepares Browser Pilot for v2.3.0 when enhanced mode becomes the default.
 
-All Browser Pilot compatibility issues have been resolved in ModelForge v2.2.0.
+All Browser Pilot compatibility issues have been resolved in ModelForge v2.2.1.
+
+## Upgrade Instructions
+
+### For ModelForge v2.2.1+
+
+1. **Update ModelForge**: `pip install --upgrade model-forge-llm>=2.2.1`
+2. **Use Enhanced Mode**: Pass `enhanced=True` when getting LLM instances
+3. **Update Callbacks**: Ensure custom callbacks inherit from `BaseCallbackHandler`
+
+### Verification
+
+Test that Browser Pilot works correctly:
+
+```bash
+# Install/upgrade ModelForge
+pip install --upgrade model-forge-llm>=2.2.1
+
+# Run Browser Pilot with enhanced mode
+uv run browser-pilot examples/test.md --provider github_copilot --model gpt-4o --verbose
+```
+
+The integration should now work without any errors.
