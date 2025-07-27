@@ -5,6 +5,21 @@ All notable changes to ModelForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2025-07-27
+
+### Fixed
+- **LangChain Compatibility**
+  - Added missing `bind_tools()` method to `EnhancedLLM` for tool binding compatibility
+  - Added `bind()` method for parameter binding support
+  - Added `with_structured_output()` method for structured output schemas
+  - Resolves Browser Pilot integration issues with enhanced mode
+
+### Added
+- **Browser Pilot Integration Guide**
+  - Comprehensive guide for integrating Browser Pilot with ModelForge v2.2+
+  - Solutions for common compatibility issues
+  - Migration examples and best practices
+
 ## [2.2.0] - 2025-01-27
 
 ### Added
