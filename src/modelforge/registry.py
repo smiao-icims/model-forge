@@ -1,5 +1,6 @@
 # Standard library imports
 import os
+import warnings
 from typing import Any
 
 from langchain_community.chat_models import ChatOllama
@@ -19,6 +20,7 @@ except ImportError:
 
 # Local imports
 from . import auth, config
+from .enhanced_llm import EnhancedLLM
 from .exceptions import (
     ConfigurationError,
     InvalidApiKeyError,
@@ -27,6 +29,7 @@ from .exceptions import (
     ProviderNotAvailableError,
 )
 from .logging_config import get_logger
+from .modelsdev import ModelsDevClient
 from .validation import InputValidator
 
 logger = get_logger(__name__)
@@ -54,6 +57,7 @@ class ModelForgeRegistry:
         provider_name: str | None = None,
         model_alias: str | None = None,
         callbacks: list[Any] | None = None,
+        enhanced: bool | None = None,
     ) -> BaseChatModel:
         """
         Get a fully authenticated and configured LLM instance.
@@ -61,6 +65,10 @@ class ModelForgeRegistry:
             provider_name: The provider name. If None, uses current selection.
             model_alias: The model alias. If None, uses current selection.
             callbacks: Optional list of callback handlers for telemetry.
+            enhanced: If True, returns EnhancedLLM with metadata.
+                     If False, returns raw LangChain model.
+                     If None (default), checks MODELFORGE_ENHANCED env var,
+                     defaults to False. Will default to True in v2.3.0.
         Returns:
             A LangChain-compatible LLM instance ready for use.
         Raises:
@@ -73,6 +81,19 @@ class ModelForgeRegistry:
             provider_name = InputValidator.validate_provider_name(provider_name)
         if model_alias:
             model_alias = InputValidator.validate_model_name(model_alias)
+
+        # Handle enhanced parameter with gradual rollout
+        if enhanced is None:
+            env_value = os.getenv("MODELFORGE_ENHANCED", "false")
+            enhanced = (env_value or "false").lower() == "true"
+            if not enhanced:
+                warnings.warn(
+                    "Starting in model-forge v2.3.0, get_llm() will return "
+                    "EnhancedLLM by default. Set enhanced=False to keep current "
+                    "behavior or set MODELFORGE_ENHANCED=true to opt-in early.",
+                    FutureWarning,
+                    stacklevel=2,
+                )
 
         # Get model configuration
         provider_name, model_alias, provider_data, model_data = self._get_model_config(
@@ -89,11 +110,40 @@ class ModelForgeRegistry:
             )
 
         logger.info(
-            "Creating LLM instance for provider: %s, model: %s",
+            "Creating LLM instance for provider: %s, model: %s, enhanced: %s",
             provider_name,
             model_alias,
+            enhanced,
         )
 
+        # Create base LLM
+        base_llm = self._create_base_llm(
+            llm_type, provider_name, model_alias, provider_data, model_data, callbacks
+        )
+
+        # Return raw LLM if not enhanced
+        if not enhanced:
+            return base_llm
+
+        # Fetch metadata and wrap in EnhancedLLM
+        metadata = self._fetch_model_metadata(provider_name, model_alias)
+        return EnhancedLLM(
+            wrapped_llm=base_llm,
+            model_metadata=metadata,
+            provider=provider_name,
+            model_alias=model_alias,
+        )
+
+    def _create_base_llm(
+        self,
+        llm_type: str,
+        provider_name: str,
+        model_alias: str,
+        provider_data: dict[str, Any],
+        model_data: dict[str, Any],
+        callbacks: list[Any] | None = None,
+    ) -> BaseChatModel:
+        """Create base LLM instance based on type."""
         # Direct instantiation based on llm_type
         if llm_type == "openai_compatible":
             return self._create_openai_compatible(
@@ -303,3 +353,29 @@ class ModelForgeRegistry:
         return ChatGoogleGenerativeAI(
             model=actual_model_name, google_api_key=api_key, callbacks=callbacks
         )
+
+    def _fetch_model_metadata(self, provider: str, model: str) -> dict[str, Any]:
+        """Fetch and cache model metadata from models.dev."""
+        try:
+            client = ModelsDevClient()
+            model_info = client.get_model_info(provider, model)
+
+            # Transform to our metadata format
+            return {
+                "context_length": model_info.get("limit", {}).get("context", 0),
+                "max_tokens": model_info.get("limit", {}).get("output", 0),
+                "capabilities": client._extract_capabilities(model_info),
+                "pricing": client._extract_pricing(model_info),
+                "knowledge_cutoff": model_info.get("knowledge_cutoff"),
+                "raw_info": model_info,  # Keep raw data for model_info property
+            }
+        except Exception as e:
+            logger.warning(f"Failed to fetch metadata for {provider}/{model}: {e}")
+            # Return safe defaults
+            return {
+                "context_length": 0,
+                "max_tokens": 0,
+                "capabilities": [],
+                "pricing": {},
+                "raw_info": {},
+            }
