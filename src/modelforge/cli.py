@@ -346,6 +346,13 @@ def test_model(
     """
     import sys
 
+    # Set logging level based on verbose flag
+    if not verbose:
+        # Suppress INFO and below logs when not in verbose mode
+        import logging
+
+        logging.getLogger("modelforge").setLevel(logging.WARNING)
+
     # Determine input source
     if prompt and input_file:
         raise click.BadParameter("Cannot specify both --prompt and --input-file")
@@ -388,7 +395,8 @@ def test_model(
             suggestion="Re-select a model using 'modelforge config use'",
         )
 
-    logger.info("Testing model %s/%s with prompt", provider_name, model_alias)
+    if verbose:
+        logger.info("Testing model %s/%s with prompt", provider_name, model_alias)
     print_info(
         f"Sending prompt to the selected model [{provider_name}/{model_alias}]..."
     )
