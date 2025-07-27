@@ -201,7 +201,9 @@ class TestCLIIOEnhancements:
         mock_llm = MagicMock()
 
         # Setup telemetry callback to have metrics
-        def get_llm_side_effect(callbacks=None):
+        def get_llm_side_effect(
+            callbacks: list | None = None, enhanced: bool = False
+        ) -> MagicMock:
             if callbacks and len(callbacks) > 0:
                 # Set some token usage on the callback
                 callbacks[0].metrics.token_usage.total_tokens = 100
