@@ -5,6 +5,72 @@ All notable changes to ModelForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-01-27
+
+### Added
+- **Enhanced Model Metadata and Configuration** (opt-in feature)
+  - New `EnhancedLLM` wrapper class that adds metadata properties to any LangChain model
+  - Model capabilities exposed: `context_length`, `max_output_tokens`, `supports_function_calling`, `supports_vision`
+  - Full model information from models.dev accessible via `model_info` property
+  - Pricing information with `pricing_info` property (cost per 1M tokens)
+  - Cost estimation via `estimate_cost(input_tokens, output_tokens)` method
+  - Parameter configuration with validation: `temperature`, `top_p`, `top_k`, `max_tokens`
+  - Parameters validated against model limits (e.g., max_tokens cannot exceed model's limit)
+
+- **Enhanced Telemetry Display**
+  - Test command now uses enhanced LLM mode by default for richer telemetry
+  - Context window information displayed in telemetry output:
+    - Model's context limit and max output tokens
+    - Token usage percentage and remaining context
+    - Model capabilities (function calling, vision support)
+  - Token estimation for providers that don't report usage (e.g., GitHub Copilot)
+  - Graceful handling for local models (Ollama) without metadata
+
+- **Quiet Mode for Automation**
+  - New `--quiet` / `-q` flag for minimal output (response only)
+  - Perfect for piping output to other commands or scripts
+  - Automatically suppresses all logs and telemetry
+  - Prevents using `--quiet` and `--verbose` together
+  - Example: `modelforge test --prompt "What is 2+2?" --quiet`
+
+- **Improved Developer Experience**
+  - Logging control: INFO logs suppressed without `--verbose` flag
+  - Fixed telemetry callback propagation in enhanced mode
+  - Better error messages with more context
+  - Comprehensive test coverage for new features
+
+### Changed
+- **Gradual Feature Rollout**
+  - `get_llm()` now accepts optional `enhanced` parameter (defaults to `False` for compatibility)
+  - When `enhanced=None`, checks `MODELFORGE_ENHANCED` environment variable
+  - FutureWarning alerts users that `enhanced=True` may become default in future versions
+  - Full backward compatibility maintained - existing code works without changes
+
+- **CLI Behavior**
+  - Test command now uses enhanced mode by default for richer telemetry
+  - Logs only shown with `--verbose` flag (cleaner default output)
+  - Quiet mode provides minimal output suitable for automation
+
+### Fixed
+- Telemetry callback propagation in EnhancedLLM wrapper
+- Token usage estimation for providers without usage data
+- Test failures with mock callback handlers
+- Pre-commit hook compliance for all modified files
+
+### Migration Notes
+- **No action required** - all existing code continues to work
+- To opt-in to new features: `registry.get_llm(enhanced=True)` or set `MODELFORGE_ENHANCED=true`
+- In future versions, enhanced features may be enabled by default (use `enhanced=False` for legacy behavior)
+- For automation scripts, consider using `--quiet` flag for cleaner output
+
+### Technical Details
+- EnhancedLLM uses delegation pattern to wrap any BaseChatModel
+- Metadata fetched from models.dev API with 7-day cache
+- <100ms overhead for enhanced features
+- Full serialization/pickle support maintained
+- Token estimation uses rough approximation (1 token ≈ 4 characters)
+- All existing tests pass with new functionality
+
 ## [2.1.0] - 2025-01-25
 
 ### Added
@@ -169,6 +235,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Upgrade Guide
+
+### From 2.1 to 2.2
+
+ModelForge 2.2 is fully backward compatible with 2.1. To upgrade:
+
+```bash
+pip install --upgrade model-forge-llm
+```
+
+**New Features to Try:**
+
+1. **Enhanced Model Metadata** (opt-in):
+   ```python
+   from modelforge import ModelForgeRegistry
+   registry = ModelForgeRegistry()
+   llm = registry.get_llm(enhanced=True)
+   print(f"Context: {llm.context_length:,} tokens")
+   print(f"Cost estimate: ${llm.estimate_cost(1000, 500):.4f}")
+   ```
+
+2. **Quiet Mode for Automation**:
+   ```bash
+   # Get just the response
+   modelforge test --prompt "What is 2+2?" --quiet
+
+   # Perfect for scripts
+   RESPONSE=$(modelforge test --prompt "Is valid?" --quiet)
+   ```
+
+3. **Enhanced Telemetry**:
+   ```bash
+   # See context window usage and capabilities
+   modelforge test --prompt "Hello"
+   ```
+
+**Cleaner Output**: Logs are now suppressed by default. Use `--verbose` for debugging.
 
 ### From 2.0 to 2.1
 

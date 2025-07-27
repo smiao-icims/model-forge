@@ -52,6 +52,7 @@ class TelemetryCallback(BaseCallbackHandler):
         super().__init__()
         self.metrics = ModelMetrics(provider=provider, model=model)
         self._start_time: float | None = None
+        self._prompts: list[str] = []
 
     def on_llm_start(
         self, serialized: dict[str, Any], prompts: list[str], **kwargs: Any
@@ -59,6 +60,7 @@ class TelemetryCallback(BaseCallbackHandler):
         """Called when LLM starts processing."""
         self._start_time = time.time()
         self.metrics.start_time = datetime.now(UTC)
+        self._prompts = prompts  # Save prompts for token estimation
         logger.debug(f"LLM started: {self.metrics.provider}/{self.metrics.model}")
 
     def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
@@ -82,6 +84,33 @@ class TelemetryCallback(BaseCallbackHandler):
                 self.metrics.metadata["actual_model"] = response.llm_output[
                     "model_name"
                 ]
+
+        # If no token usage reported (common with GitHub Copilot), estimate it
+        if self.metrics.token_usage.total_tokens == 0 and response.generations:
+            # Estimate tokens (rough approximation: 1 token ≈ 4 chars)
+            prompt_text = " ".join(self._prompts) if self._prompts else ""
+            completion_text = ""
+            for generation_list in response.generations:
+                for generation in generation_list:
+                    completion_text += (
+                        generation.text
+                        if hasattr(generation, "text")
+                        else str(generation.message.content)
+                    )
+
+            # Very rough token estimation
+            estimated_prompt_tokens = len(prompt_text) // 4 if prompt_text else 10
+            estimated_completion_tokens = (
+                len(completion_text) // 4 if completion_text else 10
+            )
+
+            if estimated_prompt_tokens > 0 or estimated_completion_tokens > 0:
+                self.metrics.token_usage.prompt_tokens = estimated_prompt_tokens
+                self.metrics.token_usage.completion_tokens = estimated_completion_tokens
+                self.metrics.token_usage.total_tokens = (
+                    estimated_prompt_tokens + estimated_completion_tokens
+                )
+                self.metrics.metadata["token_estimation"] = True
 
         # Calculate estimated cost
         self.metrics.estimated_cost = calculate_cost(
@@ -128,6 +157,7 @@ PRICING = {
         # These are for estimation purposes only
         "gpt-4o": {"input": 0.0025, "output": 0.01},
         "gpt-4": {"input": 0.03, "output": 0.06},
+        "gpt-4.1": {"input": 0.03, "output": 0.06},  # Same as gpt-4
         "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
     },
 }
@@ -190,12 +220,48 @@ def format_metrics(metrics: ModelMetrics) -> str:
         [
             f"Duration: {metrics.duration_ms:.0f}ms",
             "",
-            "📝 Token Usage:",
+            "📝 Token Usage:"
+            + (" (estimated)" if metrics.metadata.get("token_estimation") else ""),
             f"  Prompt tokens: {metrics.token_usage.prompt_tokens:,}",
             f"  Completion tokens: {metrics.token_usage.completion_tokens:,}",
             f"  Total tokens: {metrics.token_usage.total_tokens:,}",
         ]
     )
+
+    # Add context information if available (from enhanced LLM)
+    if metrics.metadata.get("context_length"):
+        context_length = metrics.metadata["context_length"]
+        used_tokens = metrics.token_usage.prompt_tokens
+        remaining = context_length - used_tokens
+        usage_percent = (
+            (used_tokens / context_length * 100) if context_length > 0 else 0
+        )
+
+        lines.extend(
+            [
+                "",
+                "📊 Context Window:",
+                f"  Model limit: {context_length:,} tokens",
+                f"  Used: {used_tokens:,} tokens ({usage_percent:.1f}%)",
+                f"  Remaining: {remaining:,} tokens",
+            ]
+        )
+
+        # Add capabilities info if available
+        if metrics.metadata.get("max_output_tokens"):
+            lines.append(
+                f"  Max output: {metrics.metadata['max_output_tokens']:,} tokens"
+            )
+
+        # Add model capabilities
+        capabilities = []
+        if metrics.metadata.get("supports_function_calling"):
+            capabilities.append("✓ Functions")
+        if metrics.metadata.get("supports_vision"):
+            capabilities.append("✓ Vision")
+
+        if capabilities:
+            lines.append(f"  Capabilities: {', '.join(capabilities)}")
 
     if metrics.estimated_cost > 0:
         lines.extend(

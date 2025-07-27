@@ -307,6 +307,68 @@ class TestFormatMetrics:
         assert "Completion tokens: 5,000" in result
         assert "Total tokens: 15,000" in result
 
+    def test_formatting_with_context_info(self) -> None:
+        """Test formatting with context window information from enhanced LLM."""
+        metrics = ModelMetrics(
+            provider="openai",
+            model="gpt-4",
+            duration_ms=2000.0,
+            token_usage=TokenUsage(
+                prompt_tokens=1000, completion_tokens=500, total_tokens=1500
+            ),
+            estimated_cost=0.045,
+            metadata={
+                "context_length": 128000,
+                "max_output_tokens": 4096,
+                "supports_function_calling": True,
+                "supports_vision": True,
+            },
+        )
+
+        result = format_metrics(metrics)
+
+        # Check basic info
+        assert "📊 Telemetry Information" in result
+        assert "Provider: openai" in result
+        assert "Model: gpt-4" in result
+
+        # Check context window information
+        assert "📊 Context Window:" in result
+        assert "Model limit: 128,000 tokens" in result
+        assert "Used: 1,000 tokens (0.8%)" in result
+        assert "Remaining: 127,000 tokens" in result
+        assert "Max output: 4,096 tokens" in result
+        assert "Capabilities: ✓ Functions, ✓ Vision" in result
+
+    def test_formatting_with_partial_context_info(self) -> None:
+        """Test formatting with partial context information."""
+        metrics = ModelMetrics(
+            provider="openai",
+            model="gpt-3.5-turbo",
+            duration_ms=1000.0,
+            token_usage=TokenUsage(
+                prompt_tokens=500, completion_tokens=250, total_tokens=750
+            ),
+            estimated_cost=0.001,
+            metadata={
+                "context_length": 16000,
+                "max_output_tokens": 4096,
+                "supports_function_calling": True,
+                "supports_vision": False,
+            },
+        )
+
+        result = format_metrics(metrics)
+
+        # Check context window information
+        assert "📊 Context Window:" in result
+        assert "Model limit: 16,000 tokens" in result
+        assert "Used: 500 tokens (3.1%)" in result
+        assert "Remaining: 15,500 tokens" in result
+        assert "Max output: 4,096 tokens" in result
+        assert "Capabilities: ✓ Functions" in result
+        assert "✓ Vision" not in result
+
 
 class TestIntegration:
     """Integration tests for telemetry components."""
@@ -351,6 +413,59 @@ class TestIntegration:
         # Check cost calculation (gpt-4o-mini: $0.00015/1K input, $0.0006/1K output)
         expected_cost = (250 / 1000) * 0.00015 + (100 / 1000) * 0.0006
         assert f"💰 Estimated Cost: ${expected_cost:.6f}" in output
+
+
+class TestTokenEstimation:
+    """Test token estimation for providers without usage data."""
+
+    def test_token_estimation_simple(self) -> None:
+        """Test basic token estimation."""
+        from langchain_core.messages import AIMessage
+        from langchain_core.outputs import ChatGeneration
+
+        callback = TelemetryCallback(provider="github_copilot", model="gpt-4")
+        callback._prompts = ["Write a short joke"]  # ~4 words = ~4 tokens
+
+        # Create proper response
+        message = AIMessage(
+            content="Why did the chicken cross the road? To get to the other side!"
+        )
+        generation = ChatGeneration(message=message)
+
+        llm_result = LLMResult(
+            generations=[[generation]],
+            llm_output={},  # No token usage
+        )
+
+        callback.on_llm_end(llm_result)
+
+        # Check estimation (very rough: 1 token ≈ 4 chars)
+        assert callback.metrics.token_usage.prompt_tokens > 0
+        assert callback.metrics.token_usage.completion_tokens > 0
+        assert callback.metrics.metadata.get("token_estimation") is True
+
+    def test_token_estimation_with_provided_usage(self) -> None:
+        """Test that estimation doesn't happen when usage is provided."""
+        callback = TelemetryCallback(provider="openai", model="gpt-4")
+        callback._prompts = ["Test prompt"]
+
+        llm_result = LLMResult(
+            generations=[],
+            llm_output={
+                "token_usage": {
+                    "prompt_tokens": 100,
+                    "completion_tokens": 50,
+                    "total_tokens": 150,
+                }
+            },
+        )
+
+        callback.on_llm_end(llm_result)
+
+        # Should use provided values, not estimation
+        assert callback.metrics.token_usage.prompt_tokens == 100
+        assert callback.metrics.token_usage.completion_tokens == 50
+        assert callback.metrics.metadata.get("token_estimation") is None
 
 
 class TestGitHubCopilotFormatting:

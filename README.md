@@ -6,7 +6,7 @@ A Python library for managing LLM providers, authentication, and model selection
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**🚀 Version 2.1.0 - Now with Environment Variable Auth and Streaming Support!**
+**🚀 Version 2.2.0 - Enhanced Model Metadata, Improved Telemetry, and Quiet Mode!**
 
 ## Installation
 
@@ -93,12 +93,14 @@ modelforge config add --provider ollama --model qwen3:1.7b --local
 modelforge config use --provider openai --model gpt-4o-mini
 modelforge config remove --provider openai --model gpt-4o-mini
 
-# Testing & Usage (NEW in v2.0: Flexible I/O)
+# Testing & Usage (NEW in v2.2: Quiet mode for automation)
 modelforge test --prompt "Hello, how are you?"        # Test current model
 modelforge test --prompt "Explain quantum computing" --verbose  # Debug mode
 modelforge test --input-file prompt.txt --output-file response.txt  # File I/O
 echo "What is AI?" | modelforge test                 # Stdin input
 modelforge test --prompt "Hello" --no-telemetry      # Disable telemetry
+modelforge test --prompt "What is 2+2?" --quiet      # Minimal output (v2.2)
+echo "Hello" | modelforge test --quiet > output.txt  # Perfect for piping
 
 # Cache & Maintenance
 modelforge models list --refresh                     # Force refresh from models.dev
@@ -109,7 +111,46 @@ modelforge settings telemetry off                     # Disable telemetry displa
 modelforge settings telemetry status                  # Check current setting
 ```
 
-## What's New in v2.0
+## What's New
+
+### v2.2.0 Features
+
+#### 🤫 Quiet Mode for Automation
+- **`--quiet` flag**: Minimal output showing only the model response
+- **Perfect for piping**: Clean output for scripts and automation
+- **Automatic telemetry suppression**: No metadata in quiet mode
+- **Conflict prevention**: Cannot use with `--verbose` flag
+
+#### 📊 Enhanced Telemetry Display
+- **Context window tracking**: See how much of the model's context you're using
+- **Token estimation**: Automatic estimation for providers that don't report usage
+- **Capability display**: Shows if model supports functions, vision, etc.
+- **Improved formatting**: Cleaner, more informative telemetry output
+
+#### 🎯 Enhanced Model Metadata (Opt-in)
+- **Model capabilities**: Access context length, max tokens, supported features
+- **Cost estimation**: Calculate costs before making API calls
+- **Parameter validation**: Automatic validation against model limits
+- **Backward compatible**: Opt-in feature with `enhanced=True`
+
+#### 🔧 Developer Experience
+- **Logging control**: Suppress logs without `--verbose` flag
+- **Better error messages**: More context and helpful suggestions
+- **Improved callback handling**: Fixed telemetry in enhanced mode
+
+### v2.1.0 Features
+
+#### 🔐 Environment Variable Authentication
+- Zero-touch auth for CI/CD pipelines
+- Support for all providers via env vars
+- Automatic token handling
+
+#### 🌊 Streaming Support
+- Real-time response streaming
+- Automatic auth refresh during streams
+- CLI and API streaming capabilities
+
+### v2.0 Features
 
 ### 🎯 Telemetry & Cost Tracking
 - **Token usage monitoring**: See exactly how many tokens each request uses
@@ -206,6 +247,38 @@ print(f"Estimated cost: ${telemetry.metrics.estimated_cost:.6f}")
 # Format telemetry for display
 from modelforge.telemetry import format_metrics
 print(format_metrics(telemetry.metrics))
+```
+
+### Enhanced Model Metadata (v2.2.0 - Opt-in Feature)
+
+```python
+from modelforge import ModelForgeRegistry
+
+# Enable enhanced features
+registry = ModelForgeRegistry()
+llm = registry.get_llm("openai", "gpt-4o", enhanced=True)
+
+# Access model metadata
+print(f"Context window: {llm.context_length:,} tokens")
+print(f"Max output: {llm.max_output_tokens:,} tokens")
+print(f"Supports functions: {llm.supports_function_calling}")
+print(f"Supports vision: {llm.supports_vision}")
+
+# Get pricing information
+pricing = llm.pricing_info
+print(f"Input cost: ${pricing['input_per_1m']}/1M tokens")
+print(f"Output cost: ${pricing['output_per_1m']}/1M tokens")
+
+# Estimate costs before making calls
+estimated_cost = llm.estimate_cost(input_tokens=5000, output_tokens=1000)
+print(f"Estimated cost for this request: ${estimated_cost:.4f}")
+
+# Configure parameters with validation
+llm.temperature = 0.7  # Validated against model limits
+llm.max_tokens = 2000  # Checked against model's max_output_tokens
+
+# Note: This is opt-in for now. In future versions, enhanced=True may become default
+# To maintain current behavior, explicitly use enhanced=False
 ```
 
 ### Configuration Management
