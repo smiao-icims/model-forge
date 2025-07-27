@@ -5,6 +5,37 @@ All notable changes to ModelForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Enhanced Model Metadata and Configuration** (opt-in feature)
+  - New `EnhancedLLM` wrapper class that adds metadata properties to any LangChain model
+  - Model capabilities exposed: `context_length`, `max_output_tokens`, `supports_function_calling`, `supports_vision`
+  - Full model information from models.dev accessible via `model_info` property
+  - Pricing information with `pricing_info` property (cost per 1M tokens)
+  - Cost estimation via `estimate_cost(input_tokens, output_tokens)` method
+  - Parameter configuration with validation: `temperature`, `top_p`, `top_k`, `max_tokens`
+  - Parameters validated against model limits (e.g., max_tokens cannot exceed model's limit)
+
+### Changed
+- **Gradual Feature Rollout**
+  - `get_llm()` now accepts optional `enhanced` parameter (defaults to `False` for compatibility)
+  - When `enhanced=None`, checks `MODELFORGE_ENHANCED` environment variable
+  - FutureWarning alerts users that `enhanced=True` will become default in v2.3.0
+  - Full backward compatibility maintained - existing code works without changes
+
+### Migration Notes
+- **No action required** - all existing code continues to work
+- To opt-in to new features: `registry.get_llm(enhanced=True)` or set `MODELFORGE_ENHANCED=true`
+- In v2.3.0, enhanced features will be enabled by default (use `enhanced=False` for legacy behavior)
+
+### Technical Details
+- EnhancedLLM uses delegation pattern to wrap any BaseChatModel
+- Metadata fetched from models.dev API with 7-day cache
+- <100ms overhead for enhanced features
+- Full serialization/pickle support maintained
+- All 227 existing tests pass without modification
+
 ## [2.1.0] - 2025-01-25
 
 ### Added

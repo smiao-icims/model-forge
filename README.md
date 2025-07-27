@@ -7,6 +7,7 @@ A Python library for managing LLM providers, authentication, and model selection
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **🚀 Version 2.1.0 - Now with Environment Variable Auth and Streaming Support!**
+**🎯 Version 2.2.0 (Unreleased) - Enhanced Model Metadata and Configuration!**
 
 ## Installation
 
@@ -206,6 +207,38 @@ print(f"Estimated cost: ${telemetry.metrics.estimated_cost:.6f}")
 # Format telemetry for display
 from modelforge.telemetry import format_metrics
 print(format_metrics(telemetry.metrics))
+```
+
+### Enhanced Model Metadata (NEW in v2.2.0 - Opt-in Feature)
+
+```python
+from modelforge import ModelForgeRegistry
+
+# Enable enhanced features
+registry = ModelForgeRegistry()
+llm = registry.get_llm("openai", "gpt-4o", enhanced=True)
+
+# Access model metadata
+print(f"Context window: {llm.context_length:,} tokens")
+print(f"Max output: {llm.max_output_tokens:,} tokens")
+print(f"Supports functions: {llm.supports_function_calling}")
+print(f"Supports vision: {llm.supports_vision}")
+
+# Get pricing information
+pricing = llm.pricing_info
+print(f"Input cost: ${pricing['input_per_1m']}/1M tokens")
+print(f"Output cost: ${pricing['output_per_1m']}/1M tokens")
+
+# Estimate costs before making calls
+estimated_cost = llm.estimate_cost(input_tokens=5000, output_tokens=1000)
+print(f"Estimated cost for this request: ${estimated_cost:.4f}")
+
+# Configure parameters with validation
+llm.temperature = 0.7  # Validated against model limits
+llm.max_tokens = 2000  # Checked against model's max_output_tokens
+
+# Note: This is opt-in for now. In v2.3.0, enhanced=True will be default
+# To maintain current behavior after v2.3.0, use enhanced=False
 ```
 
 ### Configuration Management
