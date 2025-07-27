@@ -1,6 +1,7 @@
 """Tests for EnhancedLLM wrapper functionality."""
 
 import pickle
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -21,7 +22,13 @@ class MockLLM(BaseChatModel):
         """Return the type of LLM."""
         return "mock"
 
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+    def _generate(
+        self,
+        messages: list[Any],
+        stop: list[str] | None = None,
+        run_manager: Any | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
         """Mock generation."""
         from langchain_core.messages import AIMessage
 
@@ -29,23 +36,45 @@ class MockLLM(BaseChatModel):
             generations=[ChatGeneration(message=AIMessage(content="Mock response"))]
         )
 
-    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+    async def _agenerate(
+        self,
+        messages: list[Any],
+        stop: list[str] | None = None,
+        run_manager: Any | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
         """Mock async generation."""
+        from langchain_core.messages import AIMessage
+
         return ChatResult(
-            generations=[ChatGeneration(message={"content": "Mock async response"})]
+            generations=[
+                ChatGeneration(message=AIMessage(content="Mock async response"))
+            ]
         )
 
     @property
-    def _identifying_params(self):
+    def _identifying_params(self) -> dict[str, Any]:
         return {"temperature": self.temperature}
 
-    def _stream(self, messages, stop=None, run_manager=None, **kwargs):
+    def _stream(
+        self,
+        messages: list[Any],
+        stop: list[str] | None = None,
+        run_manager: Any | None = None,
+        **kwargs: Any,
+    ) -> Any:
         """Mock streaming."""
         yield "Mock"
         yield " streaming"
         yield " response"
 
-    async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
+    async def _astream(
+        self,
+        messages: list[Any],
+        stop: list[str] | None = None,
+        run_manager: Any | None = None,
+        **kwargs: Any,
+    ) -> Any:
         """Mock async streaming."""
         yield "Mock"
         yield " async"
@@ -53,13 +82,13 @@ class MockLLM(BaseChatModel):
 
 
 @pytest.fixture
-def mock_llm():
+def mock_llm() -> MockLLM:
     """Create a mock LLM instance."""
     return MockLLM()
 
 
 @pytest.fixture
-def mock_metadata():
+def mock_metadata() -> dict[str, Any]:
     """Create mock metadata."""
     return {
         "context_length": 128000,
@@ -79,7 +108,7 @@ def mock_metadata():
 
 
 @pytest.fixture
-def enhanced_llm(mock_llm, mock_metadata):
+def enhanced_llm(mock_llm: MockLLM, mock_metadata: dict[str, Any]) -> EnhancedLLM:
     """Create an EnhancedLLM instance."""
     return EnhancedLLM(
         wrapped_llm=mock_llm,
@@ -92,23 +121,23 @@ def enhanced_llm(mock_llm, mock_metadata):
 class TestMetadataProperties:
     """Test metadata property access."""
 
-    def test_context_length(self, enhanced_llm):
+    def test_context_length(self, enhanced_llm: EnhancedLLM) -> None:
         """Test context_length property."""
         assert enhanced_llm.context_length == 128000
 
-    def test_max_output_tokens(self, enhanced_llm):
+    def test_max_output_tokens(self, enhanced_llm: EnhancedLLM) -> None:
         """Test max_output_tokens property."""
         assert enhanced_llm.max_output_tokens == 4096
 
-    def test_supports_function_calling(self, enhanced_llm):
+    def test_supports_function_calling(self, enhanced_llm: EnhancedLLM) -> None:
         """Test supports_function_calling property."""
         assert enhanced_llm.supports_function_calling is True
 
-    def test_supports_vision(self, enhanced_llm):
+    def test_supports_vision(self, enhanced_llm: EnhancedLLM) -> None:
         """Test supports_vision property."""
         assert enhanced_llm.supports_vision is True
 
-    def test_model_info(self, enhanced_llm):
+    def test_model_info(self, enhanced_llm: EnhancedLLM) -> None:
         """Test model_info property returns copy."""
         info = enhanced_llm.model_info
         assert info["id"] == "gpt-4"
@@ -116,14 +145,14 @@ class TestMetadataProperties:
         info["modified"] = True
         assert "modified" not in enhanced_llm.model_info
 
-    def test_pricing_info(self, enhanced_llm):
+    def test_pricing_info(self, enhanced_llm: EnhancedLLM) -> None:
         """Test pricing_info property."""
         pricing = enhanced_llm.pricing_info
         assert pricing["input_per_1m"] == 5.0
         assert pricing["output_per_1m"] == 15.0
         assert pricing["currency"] == "USD"
 
-    def test_missing_metadata_defaults(self):
+    def test_missing_metadata_defaults(self) -> None:
         """Test defaults when metadata is missing."""
         llm = EnhancedLLM(
             wrapped_llm=MockLLM(),
@@ -140,7 +169,7 @@ class TestMetadataProperties:
 class TestParameterConfiguration:
     """Test parameter configuration."""
 
-    def test_temperature_get_set(self, enhanced_llm):
+    def test_temperature_get_set(self, enhanced_llm: EnhancedLLM) -> None:
         """Test temperature getter and setter."""
         # Default from wrapped model
         assert enhanced_llm.temperature == 0.7
@@ -151,7 +180,7 @@ class TestParameterConfiguration:
         # Should also update wrapped model
         assert enhanced_llm._wrapped_llm.temperature == 1.2
 
-    def test_temperature_validation(self, enhanced_llm):
+    def test_temperature_validation(self, enhanced_llm: EnhancedLLM) -> None:
         """Test temperature validation."""
         with pytest.raises(ValueError, match="temperature must be between 0 and 2"):
             enhanced_llm.temperature = 2.5
@@ -159,17 +188,17 @@ class TestParameterConfiguration:
         with pytest.raises(ValueError, match="temperature must be between 0 and 2"):
             enhanced_llm.temperature = -0.1
 
-    def test_top_p_get_set(self, enhanced_llm):
+    def test_top_p_get_set(self, enhanced_llm: EnhancedLLM) -> None:
         """Test top_p parameter."""
         enhanced_llm.top_p = 0.9
         assert enhanced_llm.top_p == 0.9
 
-    def test_top_p_validation(self, enhanced_llm):
+    def test_top_p_validation(self, enhanced_llm: EnhancedLLM) -> None:
         """Test top_p validation."""
         with pytest.raises(ValueError, match="top_p must be between 0 and 1"):
             enhanced_llm.top_p = 1.5
 
-    def test_max_tokens_validation(self, enhanced_llm):
+    def test_max_tokens_validation(self, enhanced_llm: EnhancedLLM) -> None:
         """Test max_tokens validation against model limit."""
         enhanced_llm.max_tokens = 2000  # Should work
         assert enhanced_llm.max_tokens == 2000
@@ -181,30 +210,26 @@ class TestParameterConfiguration:
 class TestCostEstimation:
     """Test cost estimation functionality."""
 
-    def test_estimate_cost(self, enhanced_llm):
+    def test_estimate_cost(self, enhanced_llm: EnhancedLLM) -> None:
         """Test cost estimation calculation."""
         # 1000 input tokens, 500 output tokens
         cost = enhanced_llm.estimate_cost(1000, 500)
 
-        # Input: 1000/1M * 5.0 = 0.005
-        # Output: 500/1M * 15.0 = 0.0075
-        # Total: 0.0125
+        # Cost calculation: Input=0.005, Output=0.0075, Total=0.0125
         assert cost == pytest.approx(0.0125)
 
-    def test_estimate_cost_large_values(self, enhanced_llm):
+    def test_estimate_cost_large_values(self, enhanced_llm: EnhancedLLM) -> None:
         """Test cost estimation with large token counts."""
         cost = enhanced_llm.estimate_cost(1_000_000, 500_000)
 
-        # Input: 1M/1M * 5.0 = 5.0
-        # Output: 500K/1M * 15.0 = 7.5
-        # Total: 12.5
+        # Cost calculation: Input=5.0, Output=7.5, Total=12.5
         assert cost == pytest.approx(12.5)
 
 
 class TestDelegation:
     """Test method delegation to wrapped model."""
 
-    def test_generate_delegation(self, enhanced_llm):
+    def test_generate_delegation(self, enhanced_llm: EnhancedLLM) -> None:
         """Test _generate delegates to wrapped model."""
         messages = [HumanMessage(content="Hello")]
         result = enhanced_llm._generate(messages)
@@ -212,7 +237,7 @@ class TestDelegation:
         assert isinstance(result, ChatResult)
         assert result.generations[0].message.content == "Mock response"
 
-    def test_custom_params_in_generate(self, enhanced_llm):
+    def test_custom_params_in_generate(self, enhanced_llm: EnhancedLLM) -> None:
         """Test custom parameters are passed to generation."""
         enhanced_llm.temperature = 0.5
         enhanced_llm._custom_params["custom_param"] = "value"
@@ -228,7 +253,7 @@ class TestDelegation:
             assert kwargs["custom_param"] == "value"
             assert kwargs["extra_param"] == "extra"
 
-    def test_attribute_delegation(self, enhanced_llm):
+    def test_attribute_delegation(self, enhanced_llm: EnhancedLLM) -> None:
         """Test unknown attributes delegate to wrapped model."""
         # Access wrapped model's _llm_type
         assert enhanced_llm._llm_type == "mock"
@@ -238,10 +263,56 @@ class TestDelegation:
             _ = enhanced_llm.nonexistent_attr
 
 
+class TestCallbackIntegration:
+    """Test callback integration with wrapped model."""
+
+    def test_callback_propagation(self) -> None:
+        """Test callbacks from wrapped model are accessible."""
+        from modelforge.telemetry import TelemetryCallback
+
+        # Create wrapped LLM with callbacks
+        telemetry_callback = TelemetryCallback(provider="test", model="test-model")
+        wrapped_llm = MockLLM()
+        wrapped_llm.callbacks = [telemetry_callback]
+
+        # Create EnhancedLLM
+        enhanced_llm = EnhancedLLM(
+            wrapped_llm=wrapped_llm,
+            model_metadata={"context_length": 1000},
+            provider="test",
+            model_alias="test-model",
+        )
+
+        # Should be accessible through delegation
+        assert enhanced_llm.callbacks == [telemetry_callback]
+
+    def test_callback_initialization(self) -> None:
+        """Test EnhancedLLM inherits callbacks from wrapped model."""
+        from modelforge.telemetry import TelemetryCallback
+
+        # Create wrapped LLM with multiple callbacks
+        telemetry1 = TelemetryCallback(provider="test", model="test-model-1")
+        telemetry2 = TelemetryCallback(provider="test", model="test-model-2")
+        wrapped_llm = MockLLM()
+        wrapped_llm.callbacks = [telemetry1, telemetry2]
+
+        # Create EnhancedLLM
+        enhanced_llm = EnhancedLLM(
+            wrapped_llm=wrapped_llm,
+            model_metadata={"context_length": 1000},
+            provider="test",
+            model_alias="test-model",
+        )
+
+        # Callbacks should be inherited
+        assert hasattr(enhanced_llm, "callbacks")
+        assert enhanced_llm.callbacks == [telemetry1, telemetry2]
+
+
 class TestSerialization:
     """Test pickling support."""
 
-    def test_pickle_unpickle(self, enhanced_llm):
+    def test_pickle_unpickle(self, enhanced_llm: EnhancedLLM) -> None:
         """Test EnhancedLLM can be pickled and unpickled."""
         # Set some custom state
         enhanced_llm.temperature = 0.8
@@ -249,7 +320,7 @@ class TestSerialization:
 
         # Pickle and unpickle
         pickled = pickle.dumps(enhanced_llm)
-        unpickled = pickle.loads(pickled)
+        unpickled = pickle.loads(pickled)  # noqa: S301
 
         # Verify state is preserved
         assert unpickled.temperature == 0.8
@@ -262,7 +333,7 @@ class TestSerialization:
 class TestStringRepresentation:
     """Test string representation."""
 
-    def test_repr(self, enhanced_llm):
+    def test_repr(self, enhanced_llm: EnhancedLLM) -> None:
         """Test __repr__ method."""
         repr_str = repr(enhanced_llm)
         assert "EnhancedLLM" in repr_str

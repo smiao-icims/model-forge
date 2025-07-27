@@ -63,6 +63,10 @@ class EnhancedLLM(BaseChatModel):
             model_alias: Model alias (e.g., "gpt-4", "gemini-pro")
             **kwargs: Additional keyword arguments for parent class
         """
+        # Extract callbacks from wrapped model if present
+        if hasattr(wrapped_llm, "callbacks") and wrapped_llm.callbacks:
+            kwargs["callbacks"] = wrapped_llm.callbacks
+
         # Initialize parent without the wrapped model as a field
         super().__init__(**kwargs)
 

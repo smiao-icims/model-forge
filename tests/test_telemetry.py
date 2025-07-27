@@ -415,6 +415,59 @@ class TestIntegration:
         assert f"💰 Estimated Cost: ${expected_cost:.6f}" in output
 
 
+class TestTokenEstimation:
+    """Test token estimation for providers without usage data."""
+
+    def test_token_estimation_simple(self) -> None:
+        """Test basic token estimation."""
+        from langchain_core.messages import AIMessage
+        from langchain_core.outputs import ChatGeneration
+
+        callback = TelemetryCallback(provider="github_copilot", model="gpt-4")
+        callback._prompts = ["Write a short joke"]  # ~4 words = ~4 tokens
+
+        # Create proper response
+        message = AIMessage(
+            content="Why did the chicken cross the road? To get to the other side!"
+        )
+        generation = ChatGeneration(message=message)
+
+        llm_result = LLMResult(
+            generations=[[generation]],
+            llm_output={},  # No token usage
+        )
+
+        callback.on_llm_end(llm_result)
+
+        # Check estimation (very rough: 1 token ≈ 4 chars)
+        assert callback.metrics.token_usage.prompt_tokens > 0
+        assert callback.metrics.token_usage.completion_tokens > 0
+        assert callback.metrics.metadata.get("token_estimation") is True
+
+    def test_token_estimation_with_provided_usage(self) -> None:
+        """Test that estimation doesn't happen when usage is provided."""
+        callback = TelemetryCallback(provider="openai", model="gpt-4")
+        callback._prompts = ["Test prompt"]
+
+        llm_result = LLMResult(
+            generations=[],
+            llm_output={
+                "token_usage": {
+                    "prompt_tokens": 100,
+                    "completion_tokens": 50,
+                    "total_tokens": 150,
+                }
+            },
+        )
+
+        callback.on_llm_end(llm_result)
+
+        # Should use provided values, not estimation
+        assert callback.metrics.token_usage.prompt_tokens == 100
+        assert callback.metrics.token_usage.completion_tokens == 50
+        assert callback.metrics.metadata.get("token_estimation") is None
+
+
 class TestGitHubCopilotFormatting:
     """Test GitHub Copilot specific formatting."""
 
