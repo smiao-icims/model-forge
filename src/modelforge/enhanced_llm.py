@@ -295,6 +295,18 @@ class EnhancedLLM(BaseChatModel):
         ):
             yield chunk
 
+    def bind_tools(self, tools: list[Any], **kwargs: Any) -> Any:
+        """Bind tools by delegating to wrapped model."""
+        return self._wrapped_llm.bind_tools(tools, **kwargs)
+
+    def with_structured_output(self, schema: Any, **kwargs: Any) -> Any:
+        """Bind structured output schema by delegating to wrapped model."""
+        return self._wrapped_llm.with_structured_output(schema, **kwargs)
+
+    def bind(self, **kwargs: Any) -> Any:
+        """Bind parameters by delegating to wrapped model."""
+        return self._wrapped_llm.bind(**kwargs)
+
     @property
     def _llm_type(self) -> str:
         """Return the LLM type from wrapped model."""
