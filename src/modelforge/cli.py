@@ -327,6 +327,7 @@ def remove_model(
 @click.option("--verbose", is_flag=True, help="Enable verbose debug output.")
 @click.option("--no-telemetry", is_flag=True, help="Disable telemetry output.")
 @click.option("--stream", is_flag=True, help="Stream the response in real-time.")
+@click.option("--quiet", "-q", is_flag=True, help="Minimal output (response only).")
 def test_model(
     prompt: str | None,
     input_file: str | None,
@@ -334,6 +335,7 @@ def test_model(
     verbose: bool,
     no_telemetry: bool,
     stream: bool,
+    quiet: bool,
 ) -> None:
     """Tests the currently selected model with a prompt.
 
@@ -343,14 +345,25 @@ def test_model(
     - stdin (if neither flag is provided)
 
     Output goes to stdout by default, or to file with --output-file.
+
+    Use --quiet for minimal output suitable for piping (response only).
     """
     import sys
 
-    # Set logging level based on verbose flag
-    if not verbose:
-        # Suppress INFO and below logs when not in verbose mode
-        import logging
+    # Handle conflicting flags
+    if quiet and verbose:
+        raise click.BadParameter("Cannot use --quiet and --verbose together")
 
+    # Set logging level based on flags
+    import logging
+
+    if quiet:
+        # Suppress all logs in quiet mode
+        logging.getLogger("modelforge").setLevel(logging.CRITICAL)
+        # Also disable telemetry in quiet mode
+        no_telemetry = True
+    elif not verbose:
+        # Suppress INFO and below logs when not in verbose mode
         logging.getLogger("modelforge").setLevel(logging.WARNING)
 
     # Determine input source
@@ -397,9 +410,10 @@ def test_model(
 
     if verbose:
         logger.info("Testing model %s/%s with prompt", provider_name, model_alias)
-    print_info(
-        f"Sending prompt to the selected model [{provider_name}/{model_alias}]..."
-    )
+    if not quiet:
+        print_info(
+            f"Sending prompt to the selected model [{provider_name}/{model_alias}]..."
+        )
 
     # Step 1: Create telemetry callback
     telemetry = TelemetryCallback(provider=provider_name, model=model_alias)
@@ -433,8 +447,8 @@ def test_model(
         # Get provider config for auth handling during streaming
         config_data, _ = config.get_config()
 
-        # Show prompt first for streaming
-        if not output_file:
+        # Show prompt first for streaming (unless in quiet mode)
+        if not output_file and not quiet:
             max_prompt_display = 80
             if len(prompt) > max_prompt_display:
                 display_prompt = prompt[: max_prompt_display - 3] + "..."
@@ -488,7 +502,7 @@ def test_model(
 
         # Combine chunks for telemetry and file output
         response = "".join(response_chunks)
-        if not output_file:
+        if not output_file and not quiet:
             click.echo()  # New line after streaming
     # Regular invoke mode
     elif provider_name == "github_copilot":
@@ -520,18 +534,23 @@ def test_model(
                 telemetry.metrics.metadata["supports_vision"] = llm.supports_vision
             click.echo(format_metrics(telemetry.metrics))
     else:
-        # For non-streaming mode, format as Q&A chat style for console output
+        # For non-streaming mode, format output based on quiet flag
         if not stream:
-            max_prompt_display = 80  # Maximum characters to display for the prompt
-
-            if len(prompt) > max_prompt_display:
-                display_prompt = prompt[: max_prompt_display - 3] + "..."
+            if quiet:
+                # In quiet mode, only output the response
+                click.echo(response)
             else:
-                display_prompt = prompt
+                # Normal Q&A chat style for console output
+                max_prompt_display = 80  # Maximum characters to display for the prompt
 
-            click.echo()  # Empty line before Q&A
-            click.echo(click.style("Q: ", fg="blue", bold=True) + display_prompt)
-            click.echo(click.style("A: ", fg="green", bold=True) + response)
+                if len(prompt) > max_prompt_display:
+                    display_prompt = prompt[: max_prompt_display - 3] + "..."
+                else:
+                    display_prompt = prompt
+
+                click.echo()  # Empty line before Q&A
+                click.echo(click.style("Q: ", fg="blue", bold=True) + display_prompt)
+                click.echo(click.style("A: ", fg="green", bold=True) + response)
 
         # Step 5: Display telemetry information (unless disabled)
         settings = config.get_settings()
