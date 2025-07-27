@@ -13,6 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 # Local imports
 from . import auth, config
+from .enhanced_llm import EnhancedLLM
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -525,7 +526,7 @@ def test_model(
             telemetry.metrics.token_usage.total_tokens > 0 or verbose
         ):
             # Add context information if using enhanced LLM
-            if hasattr(llm, "context_length"):
+            if isinstance(llm, EnhancedLLM):
                 telemetry.metrics.metadata["context_length"] = llm.context_length
                 telemetry.metrics.metadata["max_output_tokens"] = llm.max_output_tokens
                 telemetry.metrics.metadata["supports_function_calling"] = (
@@ -560,7 +561,7 @@ def test_model(
             telemetry.metrics.token_usage.total_tokens > 0 or verbose
         ):
             # Add context information if using enhanced LLM
-            if hasattr(llm, "context_length"):
+            if isinstance(llm, EnhancedLLM):
                 telemetry.metrics.metadata["context_length"] = llm.context_length
                 telemetry.metrics.metadata["max_output_tokens"] = llm.max_output_tokens
                 telemetry.metrics.metadata["supports_function_calling"] = (

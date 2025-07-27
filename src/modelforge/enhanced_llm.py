@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.callbacks import (
+    AsyncCallbackManagerForLLMRun,
+    CallbackManagerForLLMRun,
+)
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage
-from langchain_core.outputs import ChatResult
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
 
 if TYPE_CHECKING:
     pass
@@ -255,7 +259,7 @@ class EnhancedLLM(BaseChatModel):
         self,
         messages: list[BaseMessage],
         stop: list[str] | None = None,
-        run_manager: CallbackManagerForLLMRun | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         """Async generation by delegating to wrapped model."""
@@ -281,14 +285,15 @@ class EnhancedLLM(BaseChatModel):
         self,
         messages: list[BaseMessage],
         stop: list[str] | None = None,
-        run_manager: CallbackManagerForLLMRun | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
-    ) -> Any:
+    ) -> AsyncIterator[ChatGenerationChunk]:
         """Async stream responses by delegating to wrapped model."""
         merged_kwargs = {**self._custom_params, **kwargs}
-        return await self._wrapped_llm._astream(
+        async for chunk in self._wrapped_llm._astream(
             messages, stop=stop, run_manager=run_manager, **merged_kwargs
-        )
+        ):
+            yield chunk
 
     @property
     def _llm_type(self) -> str:

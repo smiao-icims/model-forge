@@ -92,11 +92,13 @@ class TelemetryCallback(BaseCallbackHandler):
             completion_text = ""
             for generation_list in response.generations:
                 for generation in generation_list:
-                    completion_text += (
-                        generation.text
-                        if hasattr(generation, "text")
-                        else str(generation.message.content)
-                    )
+                    if hasattr(generation, "text"):
+                        completion_text += generation.text
+                    elif hasattr(generation, "message"):
+                        completion_text += str(generation.message.content)
+                    else:
+                        # Fallback for other generation types
+                        completion_text += str(generation)
 
             # Very rough token estimation
             estimated_prompt_tokens = len(prompt_text) // 4 if prompt_text else 10
