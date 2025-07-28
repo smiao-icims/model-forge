@@ -112,7 +112,9 @@ def save_config(config_data: dict[str, Any], local: bool = False) -> None:
         ) from e
 
 
-def set_current_model(provider: str, model: str, local: bool = False) -> bool:
+def set_current_model(
+    provider: str, model: str, local: bool = False, quiet: bool = False
+) -> bool:
     """
     Set the current model for the given provider.
 
@@ -120,6 +122,7 @@ def set_current_model(provider: str, model: str, local: bool = False) -> bool:
         provider: The provider name
         model: The model alias
         local: If True, modifies the local configuration
+        quiet: If True, suppresses success messages
 
     Returns:
         True if successful
@@ -161,7 +164,8 @@ def set_current_model(provider: str, model: str, local: bool = False) -> bool:
         f"model in the {scope_msg} config."
     )
     logger.info(success_message)
-    print(success_message)
+    if not quiet:
+        print(success_message)
     return True
 
 

@@ -2,7 +2,7 @@
 
 ## Issue Summary
 
-Browser Pilot was experiencing compatibility issues with ModelForge v2.2.0+:
+Browser Pilot was experiencing compatibility issues with ModelForge v2.2.2+:
 
 1. **Missing `model_info` Property**: `ValueError: "ChatGitHubCopilot" object has no field "model_info"`
 2. **Callback Validation Error**: `LangChainVerboseCallback` not recognized as `BaseCallbackHandler`
@@ -10,7 +10,7 @@ Browser Pilot was experiencing compatibility issues with ModelForge v2.2.0+:
 
 ## Root Cause
 
-ModelForge v2.2.0+ introduced an **opt-in** enhanced LLM wrapper that adds metadata properties and LangChain compatibility methods. Browser Pilot was getting the raw `ChatGitHubCopilot` object because it wasn't requesting the enhanced version, and some LangChain methods were missing from the wrapper.
+ModelForge v2.2.2+ introduced an **opt-in** enhanced LLM wrapper that adds metadata properties and LangChain compatibility methods. Browser Pilot was getting the raw `ChatGitHubCopilot` object because it wasn't requesting the enhanced version, and some LangChain methods were missing from the wrapper.
 
 ## Solution Options
 
@@ -70,7 +70,7 @@ When using `enhanced=True`, you get access to:
 
 ## Migration Timeline
 
-- **v2.2.0**: Enhanced features introduced as opt-in via `enhanced=True`
+- **v2.2.2**: Enhanced features introduced as opt-in via `enhanced=True`
 - **v2.2.1 (current)**: Added missing LangChain compatibility methods (`bind_tools`, `bind`, `with_structured_output`)
 - **v2.3.0 (planned)**: Enhanced features will be default (`enhanced=True` by default)
 

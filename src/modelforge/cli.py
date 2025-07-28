@@ -86,9 +86,21 @@ def cli() -> None:
     """ModelForge CLI for managing LLM configurations."""
 
 
-@cli.group()
-def config_group() -> None:
-    """Configuration management commands."""
+@cli.group(name="config", invoke_without_command=True)
+@click.option("--wizard", is_flag=True, help="Start interactive configuration wizard")
+@click.option("--verbose", is_flag=True, help="Enable verbose output in wizard")
+@click.pass_context
+def config_group(ctx: click.Context, wizard: bool, verbose: bool) -> None:
+    """Configuration management commands.
+
+    Run without arguments or with --wizard to start the interactive wizard.
+    """
+    if ctx.invoked_subcommand is None or wizard:
+        # No subcommand given or wizard flag - start wizard
+        from .wizard import run_wizard
+
+        run_wizard(verbose=verbose)
+    # Otherwise, let Click handle the subcommand
 
 
 @config_group.command(name="show")
@@ -965,6 +977,18 @@ def _invoke_with_smart_retry(
 
         except Exception as e:
             error_msg = str(e).lower()
+
+            # Check for quota exceeded - don't retry
+            if "quota" in error_msg and "exceeded" in error_msg:
+                logger.exception("Quota exceeded for GitHub Copilot")
+                raise ProviderError(
+                    "Quota exceeded for GitHub Copilot",
+                    context="Your usage limit has been reached for this model",
+                    suggestion=(
+                        "Please wait for your quota to reset, upgrade your plan, "
+                        "or use a different model"
+                    ),
+                ) from e
 
             # Check if this is a rate limiting error that we should retry
             if any(

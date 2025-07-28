@@ -5,9 +5,32 @@ All notable changes to ModelForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.2] - 2025-07-27
+## [2.3.0] - 2025-07-28
 
 ### Added
+- **Interactive Configuration Wizard**
+  - New `modelforge config` command (without arguments) launches interactive wizard
+  - Alternative `modelforge config --wizard` explicitly starts wizard
+  - Uses Questionary library for enhanced UX with arrow key navigation
+  - Step-by-step guided configuration:
+    - Scope selection (global vs local) with current indicator
+    - Provider selection with visual indicators:
+      - ⭐ = Recommended providers (OpenAI, Anthropic, GitHub Copilot, Google, Ollama, OpenRouter)
+      - ✅ = Already configured providers
+      - Shows auth type for unconfigured providers
+    - Authentication configuration:
+      - **NEW**: Choice to use existing credentials or re-authenticate
+      - GitHub Copilot device flow authentication
+      - API key authentication with environment variable detection
+      - Ollama requires no authentication
+    - Model selection with configuration status and pricing info
+    - Configuration testing with telemetry display
+    - **NEW**: Graceful handling of quota exceeded errors
+    - **NEW**: Current provider/model selection as defaults
+  - **NEW**: `--verbose` flag for debugging with detailed logs
+  - **NEW**: Quiet mode by default (no timestamp logs)
+  - Backward compatible provider name handling (github-copilot ↔ github_copilot)
+
 - **Provider and Model Discovery APIs**
   - `get_available_providers()` - List all providers from models.dev
   - `get_available_models(provider)` - List all/filtered models from models.dev
@@ -16,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `is_provider_configured(provider)` - Check if provider is configured
   - `is_model_configured(provider, model)` - Check if model is configured
   - Enables Browser Pilot and other agentic apps to discover and present LLM options
+
+### Fixed
+- Arrow key navigation in configuration wizard (removed disabled Choice parameter)
+- GitHub Copilot showing correct auth type (device_flow, not api_key)
+- DeviceFlowAuth initialization with proper auth_details extraction
+- Quota exceeded errors now show warnings instead of failing configuration
+- Provider name normalization for backward compatibility
+
+### Changed
+- Configuration wizard now defaults to currently selected provider and model
+- `set_current_model()` accepts `quiet` parameter to suppress output
+- Wizard suppresses verbose logs unless `--verbose` flag is set
+
+### Dependencies
+- Added `questionary>=2.0.0` for interactive CLI wizard functionality
 
 ### Documentation
 - **Browser Pilot Integration Guide Enhanced**
@@ -279,16 +317,37 @@ pip install --upgrade model-forge-llm
 
 **New Features to Try:**
 
-1. **Enhanced Model Metadata** (opt-in):
+1. **Interactive Configuration Wizard** (NEW in 2.2.2):
+   ```bash
+   # Launch interactive wizard with arrow key navigation
+   modelforge config
+
+   # Or explicitly with --wizard flag
+   modelforge config --wizard
+   ```
+
+2. **Provider Discovery APIs** (NEW in 2.2.2):
    ```python
-   from modelforge import ModelForgeRegistry
+   from modelforge.registry import ModelForgeRegistry
    registry = ModelForgeRegistry()
+
+   # Discover available providers and models
+   providers = registry.get_available_providers()
+   models = registry.get_available_models(provider="openai")
+
+   # Check user configuration
+   if registry.is_provider_configured("openai"):
+       configured = registry.get_configured_models("openai")
+   ```
+
+3. **Enhanced Model Metadata** (opt-in):
+   ```python
    llm = registry.get_llm(enhanced=True)
    print(f"Context: {llm.context_length:,} tokens")
    print(f"Cost estimate: ${llm.estimate_cost(1000, 500):.4f}")
    ```
 
-2. **Quiet Mode for Automation**:
+4. **Quiet Mode for Automation**:
    ```bash
    # Get just the response
    modelforge test --prompt "What is 2+2?" --quiet
@@ -297,11 +356,7 @@ pip install --upgrade model-forge-llm
    RESPONSE=$(modelforge test --prompt "Is valid?" --quiet)
    ```
 
-3. **Enhanced Telemetry**:
-   ```bash
-   # See context window usage and capabilities
-   modelforge test --prompt "Hello"
-   ```
+**Interactive Setup**: The new wizard makes initial configuration much easier with guided steps and automatic authentication flows.
 
 **Cleaner Output**: Logs are now suppressed by default. Use `--verbose` for debugging.
 

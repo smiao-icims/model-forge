@@ -30,6 +30,18 @@ pip install model-forge-llm
 
 ## Quick Start
 
+### 🚀 NEW: Interactive Configuration Wizard (Easiest)
+```bash
+# Launch the interactive wizard
+modelforge config
+
+# The wizard will guide you through:
+# 1. Choosing a provider (with recommendations)
+# 2. Setting up authentication
+# 3. Selecting a model
+# 4. Testing your configuration
+```
+
 ### Option 1: GitHub Copilot via Device Authentication Flow
 ```bash
 # Discover GitHub Copilot models
@@ -88,6 +100,12 @@ modelforge auth status                                 # Check auth status
 modelforge auth logout --provider openai               # Remove credentials
 
 # Configuration Management
+# Interactive Configuration Wizard (NEW in v2.2.2)
+modelforge config                                     # Launch interactive wizard
+modelforge config --wizard                            # Alternative wizard launch
+modelforge config --wizard --verbose                  # Debug mode with logs
+
+# Manual Configuration
 modelforge config add --provider openai --model gpt-4o-mini --api-key KEY
 modelforge config add --provider ollama --model qwen3:1.7b --local
 modelforge config use --provider openai --model gpt-4o-mini
@@ -112,6 +130,18 @@ modelforge settings telemetry status                  # Check current setting
 ```
 
 ## What's New
+
+### v2.2.2 Features
+
+#### 🧙 Interactive Configuration Wizard
+- **Easy setup**: Run `modelforge config` to launch the interactive wizard
+- **Visual guidance**: Arrow key navigation with clear indicators
+  - ⭐ = Recommended providers
+  - ✅ = Already configured
+- **Smart defaults**: Automatically selects current provider/model
+- **Flexible authentication**: Choose to use existing credentials or re-authenticate
+- **Live testing**: Test configuration with a sample prompt before saving
+- **Quiet by default**: No verbose logs unless `--verbose` flag is used
 
 ### v2.2.0 Features
 

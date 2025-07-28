@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "model-forge-llm"
-version = "2.2.2"
+version = "2.3.0"
 description = "A reusable library for managing LLM providers, authentication, and model selection."
 readme = "README.md"
 requires-python = ">=3.11,<4.0"
@@ -26,6 +26,7 @@ classifiers = [
 keywords = ["llm", "ai", "langchain", "openai", "ollama", "providers", "authentication"]
 dependencies = [
     "click>=8.1.7",
+    "questionary>=2.0.0",
     "requests>=2.32.3",
     "langchain-core>=0.3.0",
     "langchain-openai>=0.3.0",

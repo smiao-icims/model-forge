@@ -166,7 +166,7 @@ class ModelsDevClient:
             # Determine auth type
             if provider_key == "ollama":
                 provider_info["auth_types"] = ["none"]
-            elif provider_key == "github":
+            elif provider_key in ["github", "github_copilot", "github-copilot"]:
                 provider_info["auth_types"] = ["device_flow"]
             elif "env" in provider_data:
                 env_vars = provider_data["env"]
