@@ -361,7 +361,7 @@ class ConfigWizard:
                 )
                 return True
             questionary.print("❌ Authentication failed.", style="bold fg:red")
-            return False
+            return False  # noqa: TRY300
         except Exception as e:
             questionary.print(f"❌ Authentication error: {e}", style="bold fg:red")
             logger.exception("GitHub Copilot device flow auth failed")
@@ -395,10 +395,11 @@ class ConfigWizard:
                 auth_strategy = auth.ApiKeyAuth(provider)
                 auth_strategy._save_auth_data({"api_key": validated_key})
                 questionary.print("✅ API key saved!", style="bold fg:green")
-                return True
             except Exception as e:
                 questionary.print(f"❌ Invalid API key: {e}", style="bold fg:red")
                 return False
+            else:
+                return True  # noqa: TRY300
         else:
             return False
 
@@ -525,13 +526,14 @@ class ConfigWizard:
                     if model_name not in models:
                         models.append(model_name)
 
-            return models
         except (subprocess.CalledProcessError, FileNotFoundError):
             questionary.print(
                 "⚠️  Could not get Ollama models. Is Ollama installed?",
                 style="fg:yellow",
             )
             return []
+        else:
+            return models  # noqa: TRY300
 
     def _test_configuration(self, provider: str, model: str) -> bool:
         """Test the configuration with a simple prompt."""
@@ -572,8 +574,6 @@ class ConfigWizard:
             questionary.print(
                 "✅ Configuration test successful!", style="bold fg:green"
             )
-            return True
-
         except AuthenticationError as e:
             questionary.print(f"❌ Authentication failed: {e}", style="bold fg:red")
             if e.suggestion:
@@ -606,6 +606,8 @@ class ConfigWizard:
             # Other errors
             questionary.print(f"❌ Test failed: {e}", style="bold fg:red")
             return False
+        else:
+            return True  # noqa: TRY300
 
     def _get_or_create_provider_config(self, provider: str) -> dict[str, Any]:
         """Get existing provider config or create default."""
