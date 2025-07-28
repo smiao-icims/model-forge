@@ -30,7 +30,10 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
 """
         mock_result.returncode = 0
 
-        with patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("shutil.which", return_value="/usr/bin/ollama"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             models = wizard._get_ollama_models()
 
         assert len(models) == 3
@@ -42,7 +45,7 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         """Test Ollama model discovery when Ollama is not installed."""
         wizard = ConfigWizard()
 
-        with patch("subprocess.run", side_effect=FileNotFoundError):
+        with patch("shutil.which", return_value=None):
             models = wizard._get_ollama_models()
 
         assert models == []
@@ -55,7 +58,10 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         mock_result.stdout = "NAME    ID    SIZE    MODIFIED\n"  # Header only
         mock_result.returncode = 0
 
-        with patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("shutil.which", return_value="/usr/bin/ollama"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             models = wizard._get_ollama_models()
 
         assert models == []
@@ -115,7 +121,10 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         """Test wizard exits gracefully when not in terminal."""
         wizard = ConfigWizard()
 
-        with patch("sys.stdin.isatty", return_value=False), pytest.raises(SystemExit) as exc_info:
+        with (
+            patch("sys.stdin.isatty", return_value=False),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             wizard.run()
 
         assert exc_info.value.code == 1
@@ -133,9 +142,7 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
             mock_path.return_value = "/test/path"
             mock_get.return_value = ({"providers": {}}, "/test/path")
 
-            wizard._save_configuration(
-                "test_provider", "test_model", local=False
-            )
+            wizard._save_configuration("test_provider", "test_model", local=False)
 
             mock_save.assert_called_once()
             saved_config = mock_save.call_args[0][0]
@@ -143,7 +150,4 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
             assert "providers" in saved_config
             assert "test_provider" in saved_config["providers"]
             assert "models" in saved_config["providers"]["test_provider"]
-            assert (
-                "test_model"
-                in saved_config["providers"]["test_provider"]["models"]
-            )
+            assert "test_model" in saved_config["providers"]["test_provider"]["models"]
