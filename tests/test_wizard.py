@@ -14,8 +14,12 @@ from modelforge.wizard import ConfigWizard
 @pytest.fixture(autouse=True)
 def _mock_config_for_wizard() -> Generator[None, None, None]:
     """Auto-use fixture to mock config.get_config for all wizard tests."""
-    with patch(
-        "modelforge.config.get_config", return_value=({"providers": {}}, "/test/global")
+    with (
+        patch(
+            "modelforge.config.get_config",
+            return_value=({"providers": {}}, "/test/global"),
+        ),
+        patch("modelforge.config.get_current_model", return_value={}),
     ):
         yield
 
@@ -44,8 +48,8 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         mock_result.returncode = 0
 
         with (
-            patch("shutil.which", return_value="/usr/bin/ollama"),
-            patch("subprocess.run", return_value=mock_result),
+            patch("modelforge.wizard.shutil.which", return_value="/usr/bin/ollama"),
+            patch("modelforge.wizard.subprocess.run", return_value=mock_result),
         ):
             models = wizard._get_ollama_models()
 
@@ -58,7 +62,7 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         """Test Ollama model discovery when Ollama is not installed."""
         wizard = ConfigWizard()
 
-        with patch("shutil.which", return_value=None):
+        with patch("modelforge.wizard.shutil.which", return_value=None):
             models = wizard._get_ollama_models()
 
         assert models == []
@@ -72,8 +76,8 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         mock_result.returncode = 0
 
         with (
-            patch("shutil.which", return_value="/usr/bin/ollama"),
-            patch("subprocess.run", return_value=mock_result),
+            patch("modelforge.wizard.shutil.which", return_value="/usr/bin/ollama"),
+            patch("modelforge.wizard.subprocess.run", return_value=mock_result),
         ):
             models = wizard._get_ollama_models()
 
