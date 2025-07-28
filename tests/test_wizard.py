@@ -1,5 +1,6 @@
 """Tests for the interactive configuration wizard."""
 
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -8,6 +9,15 @@ from langchain_core.messages import AIMessage
 
 from modelforge.exceptions import AuthenticationError
 from modelforge.wizard import ConfigWizard
+
+
+@pytest.fixture(autouse=True)
+def _mock_config_for_wizard() -> Generator[None, None, None]:
+    """Auto-use fixture to mock config.get_config for all wizard tests."""
+    with patch(
+        "modelforge.config.get_config", return_value=({"providers": {}}, "/test/global")
+    ):
+        yield
 
 
 class TestConfigWizard:
