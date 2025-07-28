@@ -115,9 +115,8 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         """Test wizard exits gracefully when not in terminal."""
         wizard = ConfigWizard()
 
-        with patch("sys.stdin.isatty", return_value=False):
-            with pytest.raises(SystemExit) as exc_info:
-                wizard.run()
+        with patch("sys.stdin.isatty", return_value=False), pytest.raises(SystemExit) as exc_info:
+            wizard.run()
 
         assert exc_info.value.code == 1
         mock_questionary.print.assert_not_called()
@@ -126,23 +125,25 @@ mixtral:8x7b                    7bdf52dc5b01    26 GB     3 weeks ago
         """Test configuration saving."""
         wizard = ConfigWizard()
 
-        with patch("modelforge.config.save_config") as mock_save:
-            with patch("modelforge.config.get_config_path") as mock_path:
-                with patch("modelforge.config.get_config_from_path") as mock_get:
-                    mock_path.return_value = "/test/path"
-                    mock_get.return_value = ({"providers": {}}, "/test/path")
+        with (
+            patch("modelforge.config.save_config") as mock_save,
+            patch("modelforge.config.get_config_path") as mock_path,
+            patch("modelforge.config.get_config_from_path") as mock_get,
+        ):
+            mock_path.return_value = "/test/path"
+            mock_get.return_value = ({"providers": {}}, "/test/path")
 
-                    wizard._save_configuration(
-                        "test_provider", "test_model", local=False
-                    )
+            wizard._save_configuration(
+                "test_provider", "test_model", local=False
+            )
 
-                    mock_save.assert_called_once()
-                    saved_config = mock_save.call_args[0][0]
+            mock_save.assert_called_once()
+            saved_config = mock_save.call_args[0][0]
 
-                    assert "providers" in saved_config
-                    assert "test_provider" in saved_config["providers"]
-                    assert "models" in saved_config["providers"]["test_provider"]
-                    assert (
-                        "test_model"
-                        in saved_config["providers"]["test_provider"]["models"]
-                    )
+            assert "providers" in saved_config
+            assert "test_provider" in saved_config["providers"]
+            assert "models" in saved_config["providers"]["test_provider"]
+            assert (
+                "test_model"
+                in saved_config["providers"]["test_provider"]["models"]
+            )

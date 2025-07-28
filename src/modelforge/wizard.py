@@ -1,6 +1,7 @@
 """Interactive configuration wizard for ModelForge."""
 
 import logging
+import shutil
 import subprocess
 import sys
 from typing import Any
@@ -398,7 +399,8 @@ class ConfigWizard:
             except Exception as e:
                 questionary.print(f"❌ Invalid API key: {e}", style="bold fg:red")
                 return False
-        return False
+        else:
+            return False
 
     def _select_model(self, provider: str) -> str | None:
         """Select a model for the provider."""
@@ -499,8 +501,13 @@ class ConfigWizard:
     def _get_ollama_models(self) -> list[str]:
         """Get locally available Ollama models."""
         try:
-            result = subprocess.run(
-                ["ollama", "list"],
+            # Find ollama executable for security
+            ollama_path = shutil.which("ollama")
+            if not ollama_path:
+                raise FileNotFoundError("Ollama not found in PATH")
+
+            result = subprocess.run(  # noqa: S603
+                [ollama_path, "list"],
                 capture_output=True,
                 text=True,
                 check=True,
