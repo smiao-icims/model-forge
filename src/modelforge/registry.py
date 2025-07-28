@@ -50,6 +50,7 @@ class ModelForgeRegistry:
         """
         self.verbose = verbose
         self._config, _ = config.get_config()
+        self._models_client = ModelsDevClient()
         logger.debug("ModelForgeRegistry initialized with verbose=%s", verbose)
 
     def get_llm(
@@ -379,3 +380,176 @@ class ModelForgeRegistry:
                 "pricing": {},
                 "raw_info": {},
             }
+
+    # ===== Discovery and Listing APIs =====
+
+    def get_available_providers(
+        self, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
+        """
+        Get list of all available providers from models.dev.
+
+        Args:
+            force_refresh: Force refresh from models.dev API
+
+        Returns:
+            List of provider dictionaries with keys:
+            - name: Provider identifier (e.g., "openai", "anthropic")
+            - display_name: Human-readable name (e.g., "OpenAI", "Anthropic")
+            - description: Provider description or documentation URL
+            - auth_types: List of supported authentication types
+            - base_urls: List of API base URLs
+
+        Example:
+            >>> registry = ModelForgeRegistry()
+            >>> providers = registry.get_available_providers()
+            >>> print(f"Found {len(providers)} providers")
+            >>> for provider in providers[:3]:
+            ...     print(f"- {provider['display_name']}: {provider['description']}")
+        """
+        return self._models_client.get_providers(force_refresh=force_refresh)
+
+    def get_available_models(
+        self, provider: str | None = None, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
+        """
+        Get list of available models from models.dev.
+
+        Args:
+            provider: Filter by specific provider (e.g., "openai", "anthropic")
+            force_refresh: Force refresh from models.dev API
+
+        Returns:
+            List of model dictionaries with keys:
+            - id: Model identifier (e.g., "gpt-4", "claude-3-sonnet")
+            - provider: Provider name
+            - display_name: Human-readable model name
+            - description: Model description
+            - capabilities: List of model capabilities
+            - context_length: Maximum context window in tokens
+            - max_tokens: Maximum output tokens
+            - pricing: Cost per 1M tokens (input/output)
+
+        Example:
+            >>> registry = ModelForgeRegistry()
+            >>> # Get all models
+            >>> all_models = registry.get_available_models()
+            >>> # Get OpenAI models only
+            >>> openai_models = registry.get_available_models(provider="openai")
+            >>> print(f"OpenAI has {len(openai_models)} models")
+        """
+        return self._models_client.get_models(
+            provider=provider, force_refresh=force_refresh
+        )
+
+    def get_configured_providers(self) -> dict[str, dict[str, Any]]:
+        """
+        Get list of providers configured by the user.
+
+        Returns:
+            Dictionary mapping provider names to their configuration:
+            - Provider name as key
+            - Configuration dict as value containing:
+              - llm_type: Type of LLM implementation
+              - base_url: API base URL (if applicable)
+              - auth_strategy: Authentication method
+              - models: Dict of configured model aliases
+
+        Example:
+            >>> registry = ModelForgeRegistry()
+            >>> configured = registry.get_configured_providers()
+            >>> for provider, config in configured.items():
+            ...     models = list(config.get('models', {}).keys())
+            ...     print(f"{provider}: {len(models)} models configured")
+        """
+        # Refresh config in case it changed
+        self._config, _ = config.get_config()
+        return self._config.get("providers", {})
+
+    def get_configured_models(
+        self, provider: str | None = None
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Get list of models configured by the user.
+
+        Args:
+            provider: Filter by specific provider name
+
+        Returns:
+            Dictionary mapping model aliases to their configuration.
+            If provider is specified, returns models for that provider only.
+            If provider is None, returns all configured models across providers.
+
+        Example:
+            >>> registry = ModelForgeRegistry()
+            >>> # Get all configured models
+            >>> all_models = registry.get_configured_models()
+            >>> # Get models for specific provider
+            >>> openai_models = registry.get_configured_models("openai")
+            >>> for alias, config in openai_models.items():
+            ...     api_name = config.get('api_model_name', alias)
+            ...     print(f"Alias: {alias} -> API: {api_name}")
+        """
+        configured_providers = self.get_configured_providers()
+
+        if provider:
+            # Validate and normalize provider name
+            provider = InputValidator.validate_provider_name(provider)
+            if provider not in configured_providers:
+                return {}
+            return configured_providers[provider].get("models", {})
+
+        # Return all models from all providers
+        all_models = {}
+        for provider_name, provider_config in configured_providers.items():
+            models = provider_config.get("models", {})
+            for model_alias, model_config in models.items():
+                # Prefix with provider to avoid conflicts
+                key = f"{provider_name}/{model_alias}"
+                all_models[key] = {
+                    **model_config,
+                    "provider": provider_name,
+                    "alias": model_alias,
+                }
+        return all_models
+
+    def is_provider_configured(self, provider: str) -> bool:
+        """
+        Check if a provider is configured by the user.
+
+        Args:
+            provider: Provider name to check
+
+        Returns:
+            True if provider is configured, False otherwise
+
+        Example:
+            >>> registry = ModelForgeRegistry()
+            >>> if registry.is_provider_configured("openai"):
+            ...     print("OpenAI is configured")
+        """
+        provider = InputValidator.validate_provider_name(provider)
+        configured_providers = self.get_configured_providers()
+        return provider in configured_providers
+
+    def is_model_configured(self, provider: str, model_alias: str) -> bool:
+        """
+        Check if a specific model is configured by the user.
+
+        Args:
+            provider: Provider name
+            model_alias: Model alias to check
+
+        Returns:
+            True if model is configured, False otherwise
+
+        Example:
+            >>> registry = ModelForgeRegistry()
+            >>> if registry.is_model_configured("openai", "gpt-4"):
+            ...     print("GPT-4 is configured")
+        """
+        provider = InputValidator.validate_provider_name(provider)
+        model_alias = InputValidator.validate_model_name(model_alias)
+
+        configured_models = self.get_configured_models(provider)
+        return model_alias in configured_models

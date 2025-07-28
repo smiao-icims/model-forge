@@ -137,3 +137,111 @@ uv run browser-pilot examples/test.md --provider github_copilot --model gpt-4o -
 ```
 
 The integration should now work without any errors.
+
+## Provider and Model Discovery APIs
+
+ModelForge v2.2.1+ includes comprehensive APIs for Browser Pilot to discover and list providers and models:
+
+### Available Provider Discovery
+
+```python
+from modelforge.registry import ModelForgeRegistry
+
+registry = ModelForgeRegistry()
+
+# Get all available providers from models.dev
+providers = registry.get_available_providers()
+for provider in providers:
+    print(f"{provider['display_name']}: {provider['description']}")
+    print(f"  Auth types: {provider['auth_types']}")
+```
+
+### Available Model Discovery
+
+```python
+# Get all available models
+all_models = registry.get_available_models()
+
+# Get models for specific provider
+openai_models = registry.get_available_models(provider="openai")
+for model in openai_models:
+    print(f"{model['display_name']}: {model['context_length']:,} tokens")
+    if model.get('pricing'):
+        price = model['pricing'].get('input_per_1m_tokens', 0)
+        print(f"  Cost: ${price}/1M tokens")
+```
+
+### User Configuration Discovery
+
+```python
+# Check what providers user has configured
+configured_providers = registry.get_configured_providers()
+for provider_name, config in configured_providers.items():
+    models = config.get('models', {})
+    print(f"{provider_name}: {len(models)} models, auth: {config.get('auth_strategy')}")
+
+# Get configured models for a provider
+openai_models = registry.get_configured_models("openai")
+for alias, config in openai_models.items():
+    api_name = config.get('api_model_name', alias)
+    print(f"Alias: {alias} -> API: {api_name}")
+
+# Check if provider/model is configured
+if registry.is_provider_configured("openai"):
+    if registry.is_model_configured("openai", "gpt-4"):
+        print("GPT-4 is ready to use!")
+```
+
+### Complete Browser Pilot Integration Example
+
+```python
+from modelforge.registry import ModelForgeRegistry
+
+def setup_browser_pilot_llm():
+    """Smart LLM selection for Browser Pilot."""
+    registry = ModelForgeRegistry()
+
+    # Find best configured provider for Browser Pilot
+    for provider in ["openai", "anthropic", "github_copilot"]:
+        if registry.is_provider_configured(provider):
+            models = registry.get_configured_models(provider)
+            if models:
+                # Use first available model
+                model_alias = list(models.keys())[0]
+
+                # Get enhanced LLM with metadata
+                llm = registry.get_llm(
+                    provider_name=provider,
+                    model_alias=model_alias,
+                    enhanced=True  # Required for model_info property
+                )
+
+                print(f"Using {provider}/{model_alias}")
+                print(f"Context: {llm.context_length:,} tokens")
+                print(f"Vision: {llm.supports_vision}")
+
+                return llm
+
+    raise Exception("No suitable LLM provider configured")
+
+# Usage in Browser Pilot
+llm = setup_browser_pilot_llm()
+```
+
+### API Reference Summary
+
+| Method | Description | Returns |
+|--------|-------------|---------|
+| `get_available_providers()` | All providers from models.dev | `list[dict]` |
+| `get_available_models(provider=None)` | All/filtered models from models.dev | `list[dict]` |
+| `get_configured_providers()` | User's configured providers | `dict[str, dict]` |
+| `get_configured_models(provider=None)` | User's configured models | `dict[str, dict]` |
+| `is_provider_configured(provider)` | Check if provider configured | `bool` |
+| `is_model_configured(provider, model)` | Check if model configured | `bool` |
+
+These APIs enable Browser Pilot to:
+1. **Discover** what providers and models are available
+2. **Check** what the user has configured
+3. **Select** the best option automatically
+4. **Present** configuration options to users
+5. **Get** enhanced LLM instances ready for use
