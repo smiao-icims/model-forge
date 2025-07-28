@@ -20,6 +20,7 @@ def _mock_config_for_wizard() -> Generator[None, None, None]:
             return_value=({"providers": {}}, "/test/global"),
         ),
         patch("modelforge.config.get_current_model", return_value={}),
+        patch("modelforge.wizard.questionary.print"),
     ):
         yield
 
